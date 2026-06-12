@@ -3,60 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS2 2D Botu Simulators</title>
+    <title>CS2 2D Top-Down Simulator</title>
     <style>
         body {
-            background-color: #1a1a1a;
-            color: #fff;
-            font-family: Arial, sans-serif;
+            background-color: #121316;
+            color: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
             margin: 0;
-            padding: 20px;
-            overflow: hidden;
+            padding: 10px;
+            user-select: none;
+        }
+        .hud {
+            display: flex;
+            justify-content: space-around;
+            max-width: 800px;
+            margin: 10px auto;
+            background: rgba(30, 41, 59, 0.8);
+            padding: 10px;
+            border-radius: 6px;
+            border-bottom: 3px solid #de9b35;
+            font-weight: bold;
+            font-size: 18px;
         }
         canvas {
-            background-color: #333;
-            border: 4px solid #de9b35;
+            background-color: #23272a;
+            border: 3px solid #3e444b;
             display: block;
-            margin: 20px auto;
+            margin: 0 auto;
             cursor: crosshair;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
         }
-        .info {
-            font-size: 18px;
+        .controls-hint {
+            color: #9ca3af;
+            font-size: 14px;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
 
-    <h1>CS2 2D Offline Gameplay</h1>
-    <div class="info">
-        Punkti: <span id="score">0</span> | Dzīvības: <span id="health">100</span>
-        <br><small>Vadi tēlu ar WASD. Tēmē un šauj ar peli.</small>
+    <div class="hud">
+        <div style="color: #60a5fa;">CT (Tu): <span id="score">0</span></div>
+        <div style="color: #ef4444;">DZĪVĪBAS: <span id="health">100</span>%</div>
+        <div style="color: #fbbf24;">IEROCIS: <span id="ammo">30/90</span> (M4A1-S)</div>
     </div>
 
-    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <canvas id="csGame" width="800" height="500"></canvas>
+    
+    <div class="controls-hint">
+        Kustība: <strong>WASD</strong> | Tēmēšana: <strong>Pele</strong> | Šaušana: <strong>Kreisais klikšķis</strong> | Pārlādēt: <strong>R</strong>
+    </div>
 
 <script>
-    const canvas = document.getElementById("gameCanvas");
+    const canvas = document.getElementById("csGame");
     const ctx = canvas.getContext("2d");
 
-    // Spēlētāja iestatījumi
+    // Spēlētāja (CT) iestatījumi
     const player = {
-        x: 100,
+        x: 400,
         y: 250,
-        radius: 15,
-        color: '#4caf50',
-        speed: 4,
+        radius: 14,
+        angle: 0,
+        speed: 3.5,
         health: 100,
-        score: 0
+        score: 0,
+        ammo: 30,
+        maxAmmo: 30,
+        reserveAmmo: 90,
+        isReloading: false
     };
 
-    // Kontroles (tastatūra)
     const keys = {};
-    window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    const bullets = [];
+    const bots = [];
+    const particles = []; // Asins un šaušanas efekti
+
+    // Peles un tastatūras klausītāji
+    window.addEventListener('keydown', e => {
+        keys[e.key.toLowerCase()] = true;
+        if (e.key.toLowerCase() === 'r') reloadWeapon();
+    });
     window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-    // Peles pozīcija un šaušana
     const mouse = { x: 0, y: 0 };
     canvas.addEventListener('mousemove', e => {
         const rect = canvas.getBoundingClientRect();
@@ -64,136 +93,214 @@
         mouse.y = e.clientY - rect.top;
     });
 
-    const bullets = [];
-    canvas.addEventListener('mousedown', () => {
-        if (player.health > 0) {
-            // Aprēķina leņķi šāvienam peles virzienā
-            const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+    // Šaušanas loģika
+    canvas.addEventListener('mousedown', e => {
+        if (e.button === 0 && player.ammo > 0 && !player.isReloading && player.health > 0) {
+            player.ammo--;
+            updateHUD();
+
+            // Pievieno nelielu nejaušu atsitienu (Recoil Spread)
+            const spread = (Math.random() - 0.5) * 0.12;
+            const finalAngle = player.angle + spread;
+
             bullets.push({
-                x: player.x,
-                y: player.y,
-                dx: Math.cos(angle) * 8,
-                dy: Math.sin(angle) * 8,
-                radius: 4,
-                color: '#ffeb3b'
+                x: player.x + Math.cos(player.angle) * player.radius,
+                y: player.y + Math.sin(player.angle) * player.radius,
+                dx: Math.cos(finalAngle) * 11,
+                dy: Math.sin(finalAngle) * 11
             });
+
+            // Muzzle Flash efekts (stobra liesma)
+            createParticle(player.x + Math.cos(player.angle) * 20, player.y + Math.sin(player.angle) * 20, '#fbbf24', 4);
         }
     });
 
-    // Botu saraksts
-    const bots = [];
-    function spawnBot() {
-        if (player.health > 0 && bots.length < 5) {
-            bots.push({
-                x: canvas.width + 20,
-                y: Math.random() * (canvas.height - 40) + 20,
-                radius: 15,
-                color: '#f44336',
-                speed: Math.random() * 1.5 + 1
+    function reloadWeapon() {
+        if (!player.isReloading && player.ammo < player.maxAmmo && player.reserveAmmo > 0) {
+            player.isReloading = true;
+            document.getElementById("ammo").innerText = "PĀRLĀDĒ...";
+            setTimeout(() => {
+                const needed = player.maxAmmo - player.ammo;
+                const toTransfer = Math.min(needed, player.reserveAmmo);
+                player.ammo += toTransfer;
+                player.reserveAmmo -= toTransfer;
+                player.isReloading = false;
+                updateHUD();
+            }, 1500); // 1.5 sekundes pārlāde
+        }
+    }
+
+    function updateHUD() {
+        document.getElementById("score").innerText = player.score;
+        document.getElementById("health").innerText = Math.max(0, Math.ceil(player.health));
+        if (!player.isReloading) {
+            document.getElementById("ammo").innerText = `${player.ammo}/${player.reserveAmmo}`;
+        }
+    }
+
+    // Efektu daļiņu ģenerators (Asinis/Uzliesmojumi)
+    function createParticle(x, y, color, count) {
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x, y: y,
+                dx: (Math.random() - 0.5) * 4,
+                dy: (Math.random() - 0.5) * 4,
+                radius: Math.random() * 3 + 1,
+                color: color,
+                alpha: 1
             });
         }
     }
-    // Izveido jaunu botu ik pēc 2 sekundēm
-    setInterval(spawnBot, 2000);
 
-    // Galvenais spēles cikls (Game Loop)
-    function gameLoop() {
+    // Botu (Terroristu) izveide
+    function spawnBot() {
+        if (player.health > 0 && bots.length < 4) {
+            // Boti parādās nejaušās vietās ekrāna malās
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            if (side === 0) { x = Math.random() * canvas.width; y = -20; }
+            else if (side === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; }
+            else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
+            else { x = -20; y = Math.random() * canvas.height; }
+
+            bots.push({ x: x, y: y, radius: 14, speed: 1.8, health: 100 });
+        }
+    }
+    setInterval(spawnBot, 1800);
+
+    // Galvenais spēles cikls
+    function loop() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Ja spēlētājs ir miris
         if (player.health <= 0) {
-            ctx.fillStyle = "#fff";
-            ctx.font = "30px Arial";
-            ctx.fillText("SPĒLE BEIGTIEN", canvas.width / 2 - 100, canvas.height / 2);
+            ctx.fillStyle = "#ef4444";
+            ctx.font = "bold 40px sans-serif";
+            ctx.fillText("WASTED / K.I.A.", canvas.width / 2 - 140, canvas.height / 2);
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "20px sans-serif";
+            ctx.fillText("Pārlādē lapu, lai sāktu no jauna", canvas.width / 2 - 140, canvas.height / 2 + 40);
             return;
         }
 
-        // 1. Kustība (Spēlētājs)
+        // 1. Spēlētāja kustība (WASD)
         if (keys['w'] && player.y > player.radius) player.y -= player.speed;
         if (keys['s'] && player.y < canvas.height - player.radius) player.y += player.speed;
         if (keys['a'] && player.x > player.radius) player.x -= player.speed;
         if (keys['d'] && player.x < canvas.width - player.radius) player.x += player.speed;
 
-        // Zīmē spēlētāju
+        // Spēlētāja skata leņķis pret peli
+        player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+
+        // ZĪMĒ SPĒLĒTĀJU (CT - zils modelis ar ieroci)
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+        
+        // Ierocis (M4A1-S stobrs)
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(10, 4, 18, 5);
+        
+        // Spēlētāja ķermenis
         ctx.beginPath();
-        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-        ctx.fillStyle = player.color;
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        ctx.fillStyle = "#3b82f6"; // CT Zilā krāsa
         ctx.fill();
-        ctx.closePath();
-
-        // Tēmēklis (Līnija no spēlētāja uz peli)
-        ctx.beginPath();
-        ctx.moveTo(player.x, player.y);
-        ctx.lineTo(mouse.x, mouse.y);
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#1d4ed8";
         ctx.stroke();
+        ctx.closePath();
+        ctx.restore();
 
-        // 2. Lodes apstrāde
+        // 2. Ložu kustība
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             b.x += b.dx;
             b.y += b.dy;
 
-            // Uzzīmē lodi
             ctx.beginPath();
-            ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-            ctx.fillStyle = b.color;
+            ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = "#fbbf24";
             ctx.fill();
             ctx.closePath();
 
-            // Izdzēš lodes, kas iziet ārpus ekrāna
+            // Izdzēš lodes ārpus karšu robežām
             if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
                 bullets.splice(i, 1);
             }
         }
 
-        // 3. Botu apstrāde un loģika
+        // 3. Botu apstrāde (T - Teroristi)
         for (let i = bots.length - 1; i >= 0; i--) {
             const bot = bots[i];
-            
-            // Bots kustas uz spēlētāja pusi
-            if (bot.x > player.x) bot.x -= bot.speed;
-            else bot.x += bot.speed;
-            
-            if (bot.y > player.y) bot.y -= bot.speed;
-            else bot.y += bot.speed;
+            const botAngle = Math.atan2(player.y - bot.y, player.x - bot.x);
 
-            // Uzzīmē botu
+            // Kustība uz spēlētāja pozīciju
+            bot.x += Math.cos(botAngle) * bot.speed;
+            bot.y += Math.sin(botAngle) * bot.speed;
+
+            // ZĪMĒ BOTU (T - Oranžs/Sarkans modelis)
+            ctx.save();
+            ctx.translate(bot.x, bot.y);
+            ctx.rotate(botAngle);
+            // Bota ierocis (AK-47)
+            ctx.fillStyle = "#451a03";
+            ctx.fillRect(10, 4, 16, 5);
+            // Bota ķermenis
             ctx.beginPath();
-            ctx.arc(bot.x, bot.y, bot.radius, 0, Math.PI * 2);
-            ctx.fillStyle = bot.color;
+            ctx.arc(0, 0, bot.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "#ea580c"; // T Oranžā krāsa
             ctx.fill();
-            ctx.closePath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#c2410c";
+            ctx.stroke();
+            ctx.restore();
 
-            // Pārbauda sadursmi ar spēlētāju (Boti dara bojājumus)
-            const distToPlayer = Math.hypot(bot.x - player.x, bot.y - player.y);
-            if (distToPlayer < bot.radius + player.radius) {
-                player.health -= 0.5; // Samazina dzīvības
-                document.getElementById("health").innerText = Math.max(0, Math.floor(player.health));
+            // Sadursme ar spēlētāju (boti nodara kaitējumu)
+            const dist = Math.hypot(player.x - bot.x, player.y - bot.y);
+            if (dist < player.radius + bot.radius) {
+                player.health -= 0.4; // CT zaudē HP
+                updateHUD();
             }
 
-            // Pārbauda vai lode trāpa botam
+            // Pārbauda vai spēlētāja lode trāpa botam
             for (let j = bullets.length - 1; j >= 0; j--) {
                 const b = bullets[j];
-                const distToBullet = Math.hypot(bot.x - b.x, bot.y - b.y);
-                
-                if (distToBullet < bot.radius + b.radius) {
-                    // Trāpījums: izdzēš botu un lodi, palielina punktus
-                    bots.splice(i, 1);
+                const hitDist = Math.hypot(bot.x - b.x, bot.y - b.y);
+
+                if (hitDist < bot.radius + 3) {
+                    createParticle(bot.x, bot.y, '#ef4444', 5); // Asins efekts
                     bullets.splice(j, 1);
-                    player.score += 10;
-                    document.getElementById("score").innerText = player.score;
+                    bots.splice(i, 1);
+                    player.score += 100; // +100$ vai punkti par kill
+                    updateHUD();
                     break;
                 }
             }
         }
 
-        requestAnimationFrame(gameLoop);
+        // 4. Daļiņu (efektu) animācija
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i];
+            p.x += p.dx;
+            p.y += p.dy;
+            p.alpha -= 0.04;
+
+            ctx.save();
+            ctx.globalAlpha = p.alpha;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+            ctx.restore();
+
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+
+        requestAnimationFrame(loop);
     }
 
-    // Uzsāk pirmo botu un spēles ciklu
-    spawnBot();
-    gameLoop();
+    loop();
 </script>
 
 </body>
