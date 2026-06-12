@@ -21,7 +21,8 @@ io.on('connection', (socket) => {
     });
 });
 
+// IZMAIŅA ŠEIT: Render videi ir obligāti vajadzīgs '0.0.0.0' portam
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
+http.listen(PORT, '0.0.0.0', () => {
     console.log(`Serveris darbojas uz porta ${PORT}`);
 });
