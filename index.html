@@ -248,7 +248,7 @@
             <div class="stat-node stat-hp">HEALTH: <span id="val-node-hp">100</span></div>
             <div class="stat-node stat-armor">ARMOR: 100</div>
             <div class="stat-node stat-cash"><span id="val-node-cash">$800</span></div>
-            <div class="stat-node stat-ammo">AMMO: <span id="val-node-ammo">30/90</span></div>
+            <div class="stat-node stat-ammo">AMMO: <span id="val-node-ammo">12/24</span></div>
             <div class="stat-node" style="font-size:15px; color:#94a3b8; font-weight:600;" id="val-node-wepname">GEAR: USP-S</div>
         </div>
     </div>
@@ -271,11 +271,11 @@ const CoreEngine = {
     radarCtx: null,
     
     WeaponArsenal: {
-        pistol: { name: "USP-S", price: 0, clipMax: 12, reserveMax: 24, dmg: 34, rpm: 220, auto: false, weight: 1.0, spray: [{x:0,y:0},{x:0,y:0.01},{x:0.002,y:0.02}], recoil: 0.02, type:"sidearm" },
-        deagle: { name: "Desert Eagle", price: 700, clipMax: 7, reserveMax: 35, dmg: 72, rpm: 450, auto: false, weight: 0.94, spray: [{x:0,y:0},{x:-0.01,y:0.05},{x:0.02,y:0.09}], recoil: 0.08, type:"sidearm" },
-        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 550, auto: true, weight: 0.89, spray: [{x:0,y:0},{x:0,y:0.01},{x:-0.003,y:0.02},{x:0.004,y:0.035}], recoil: 0.03, type:"rifle" },
-        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 600, auto: true, weight: 0.86, spray: [{x:0,y:0},{x:0,y:0.015},{x:-0.005,y:0.03},{x:0.008,y:0.048}], recoil: 0.04, type:"rifle" },
-        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 1200, auto: false, weight: 0.72, spray: [{x:0,y:0}], recoil: 0.15, type:"sniper" }
+        pistol: { name: "USP-S", price: 0, clipMax: 12, reserveMax: 24, dmg: 34, rpm: 300, auto: false, weight: 1.0, recoil: 0.02, type:"sidearm" },
+        deagle: { name: "Desert Eagle", price: 700, clipMax: 7, reserveMax: 35, dmg: 72, rpm: 200, auto: false, weight: 0.94, recoil: 0.08, type:"sidearm" },
+        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 600, auto: true, weight: 0.89, recoil: 0.03, type:"rifle" },
+        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 550, auto: true, weight: 0.86, recoil: 0.04, type:"rifle" },
+        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 45, auto: false, weight: 0.72, recoil: 0.15, type:"sniper" }
     },
 
     PlayerEntity: {
@@ -356,7 +356,6 @@ const CoreEngine = {
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
-            // Saglabājam datus sadursmēm bounding box formātā
             mesh.geometry.computeBoundingBox();
             mesh.updateMatrixWorld();
             
@@ -493,7 +492,7 @@ const CoreEngine = {
                 const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
                 const mat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
                 const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set((Math.random() - 0.5) * 80, 1.15, (Math.random() - 0.5) * 80 - 30);
+                mesh.position.set((Math.random() - 0.5) * 160, 1.15, (Math.random() - 0.5) * 160 - 30);
                 CoreEngine.ThreeSetup.scene.add(mesh);
 
                 this.bots.push({
@@ -508,17 +507,12 @@ const CoreEngine = {
             this.bots.forEach(bot => {
                 if(bot.hp <= 0) return;
 
-                // Pavēršas pret spēlētāju
                 bot.mesh.lookAt(playerPos.x, bot.mesh.position.y, playerPos.z);
-
-                // Aprēķina distanci
                 let dist = bot.mesh.position.distanceTo(playerPos);
                 
-                // Ja redz spēlētāju un distance atļauj, botu inteliģence sāk uzbrukumu un šauj
                 if(dist < 70 && CoreEngine.PlayerEntity.hp > 0 && CoreEngine.isLocked) {
                     if(now - bot.lastShot > bot.shootInterval) {
                         bot.lastShot = now;
-                        // Pretinieki uzbrūk spēlētājam
                         CoreEngine.PlayerEntity.hp -= Math.floor(Math.random() * 12) + 5;
                         if(CoreEngine.PlayerEntity.hp < 0) CoreEngine.PlayerEntity.hp = 0;
                         CoreEngine.InterfaceHUD.refresh();
@@ -673,13 +667,18 @@ const CoreEngine = {
             const now = performance.now();
 
             if(p.isReloading || p.ammoClips[p.activeGear] <= 0) return;
-            if(now - lastShotTimestamp < (60000 / w.rpm)) return;
+            
+            let cooldown = p.activeGear === "awp" ? 1400 : (60000 / w.rpm);
+            if(now - lastShotTimestamp < cooldown) return;
 
             lastShotTimestamp = now;
             p.ammoClips[p.activeGear]--;
             CoreEngine.InterfaceHUD.refresh();
 
-            // Raycasting precizitātei un pretinieku satriekšanai
+            // Vizuālais atsitiens ierocim
+            CoreEngine.ThreeSetup.gunAnchor.position.z += w.recoil;
+            setTimeout(() => { CoreEngine.ThreeSetup.gunAnchor.position.z = 0; }, 60);
+
             const raycaster = new THREE.Raycaster();
             const center = new THREE.Vector2(0, 0);
             raycaster.setFromCamera(center, CoreEngine.ThreeSetup.camera);
@@ -692,12 +691,13 @@ const CoreEngine = {
                 let bot = CoreEngine.BotIntelligence.bots.find(b => b.mesh === hitMesh);
                 if(bot) {
                     bot.hp -= w.dmg;
-                    CoreEngine.InterfaceHUD.logKillEvent("HITS pretiniekam! -" + w.dmg);
+                    CoreEngine.InterfaceHUD.logKillEvent("Ievainots pretinieks (-" + w.dmg + " HP)");
+                    
                     if(bot.hp <= 0) {
-                        bot.mesh.position.y = -5; // Paslēpj mirušo botu
+                        CoreEngine.ThreeSetup.scene.remove(bot.mesh);
                         CoreEngine.scoreCT++;
                         p.money += 300;
-                        CoreEngine.InterfaceHUD.logKillEvent("PRESTINIEKS LIKVIDĒTS! +$300");
+                        CoreEngine.InterfaceHUD.logKillEvent("Likvidēts pretinieks! +$300");
                         CoreEngine.InterfaceHUD.refresh();
                     }
                 }
@@ -707,17 +707,17 @@ const CoreEngine = {
         toggleSniperScope() {
             const p = CoreEngine.PlayerEntity;
             p.isScoped = !p.isScoped;
-            const overlay = document.getElementById('sniper-scope-overlay');
-            const cross = document.getElementById('dynamic-crosshair');
-            
+            const scope = document.getElementById('sniper-scope-overlay');
+            const crosshair = document.getElementById('dynamic-crosshair');
+
             if(p.isScoped) {
-                overlay.style.display = 'block';
-                cross.style.display = 'none';
+                scope.style.display = 'block';
+                crosshair.style.display = 'none';
                 CoreEngine.ThreeSetup.camera.fov = 20;
                 CoreEngine.ThreeSetup.gunAnchor.visible = false;
             } else {
-                overlay.style.display = 'none';
-                cross.style.display = 'block';
+                scope.style.display = 'none';
+                crosshair.style.display = 'block';
                 CoreEngine.ThreeSetup.camera.fov = 74;
                 CoreEngine.ThreeSetup.gunAnchor.visible = true;
             }
@@ -725,11 +725,12 @@ const CoreEngine = {
         },
 
         throwSmokeGrenade() {
-            let pos = CoreEngine.ThreeSetup.camera.position.clone();
-            let dir = new THREE.Vector3();
-            CoreEngine.ThreeSetup.camera.getWorldDirection(dir);
-            pos.addScaledVector(dir, 12); // Nomet nedaudz uz priekšu
-            CoreEngine.EnvironmentBuilder.deploySmoke(pos);
+            let cam = CoreEngine.ThreeSetup.camera;
+            let targetPos = new THREE.Vector3();
+            cam.getWorldDirection(targetPos);
+            targetPos.multiplyScalar(15).add(cam.position);
+            targetPos.y = 0; // Detonē uz zemes
+            CoreEngine.EnvironmentBuilder.deploySmoke(targetPos);
         }
     },
 
@@ -739,7 +740,7 @@ const CoreEngine = {
             const w = CoreEngine.WeaponArsenal[p.activeGear];
             document.getElementById('val-node-hp').innerText = p.hp;
             document.getElementById('val-node-cash').innerText = "$" + p.money;
-            document.getElementById('val-node-ammo').innerText = p.ammoClips[p.activeGear] + " / " + p.ammoReserves[p.activeGear];
+            document.getElementById('val-node-ammo').innerText = p.ammoClips[p.activeGear] + "/" + p.ammoReserves[p.activeGear];
             document.getElementById('val-node-wepname').innerText = "GEAR: " + w.name;
             document.getElementById('header-score-ct').innerText = CoreEngine.scoreCT;
             document.getElementById('header-score-t').innerText = CoreEngine.scoreT;
@@ -750,97 +751,90 @@ const CoreEngine = {
             card.className = 'kill-card';
             card.innerText = text;
             logger.appendChild(card);
-            setTimeout(() => card.remove(), 4500);
+            setTimeout(() => { card.remove(); }, 4500);
+        },
+        renderRadar() {
+            if(!CoreEngine.radarCtx) return;
+            let ctx = CoreEngine.radarCtx;
+            ctx.clearRect(0, 0, 170, 170);
+            
+            let cam = CoreEngine.ThreeSetup.camera;
+            let pX = cam.position.x;
+            let pZ = cam.position.z;
+            
+            // Uzzīmē pretiniekus radarā
+            CoreEngine.BotIntelligence.bots.forEach(bot => {
+                if(bot.hp <= 0) return;
+                let relX = (bot.mesh.position.x - pX) * 0.8 + 85;
+                let relZ = (bot.mesh.position.z - pZ) * 0.8 + 85;
+                
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(relX, relZ, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
         }
     },
 
     EngineLoop: {
         execute(timestamp) {
-            window.requestAnimationFrame((t) => this.execute(t));
-
+            window.requestAnimationFrame((t) => CoreEngine.EngineLoop.execute(t));
             let delta = clock.getDelta();
-            if (delta > 0.1) delta = 0.1; // Nogriež milzīgus lēcienus lagos
+            if(delta > 0.1) delta = 0.1;
 
-            const p = CoreEngine.PlayerEntity;
-            const cam = CoreEngine.ThreeSetup.camera;
-
-            if (CoreEngine.isLocked && p.hp > 0) {
-                // Automātiskā uguns automātiem
-                const w = CoreEngine.WeaponArsenal[p.activeGear];
-                if (isLeftMousePressed && w.auto) {
+            if (CoreEngine.isLocked && CoreEngine.PlayerEntity.hp > 0) {
+                // Nepārtrauktā šaušana automātiskajiem ieročiem (AK47, M4A4)
+                if (isLeftMousePressed && CoreEngine.WeaponArsenal[CoreEngine.PlayerEntity.activeGear].auto) {
                     CoreEngine.EngineActions.triggerWeaponShot();
                 }
 
-                // 1. ĀTRUMA UN KUSTĪBAS MATEMĀTIKA (Pareizi virzieni)
+                // Kustības loģika un berze
+                let p = CoreEngine.PlayerEntity;
+                let speed = p.baseSpeed * (keys.shift ? 0.4 : 1.0);
+                
+                direction.z = Number(keys.w) - Number(keys.s);
+                direction.x = Number(keys.a) - Number(keys.d);
+                direction.normalize();
+
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
 
-                direction.z = Number(keys.w) - Number(keys.s);
-                direction.x = Number(keys.d) - Number(keys.a);
-                direction.normalize();
+                let camRotation = new THREE.Euler().setFromQuaternion(CoreEngine.ThreeSetup.camera.quaternion, 'YXZ');
+                camRotation.x = 0; // Bloķē vertikālo rotāciju kustībai
 
-                let currentSpeed = p.baseSpeed;
-                if (keys.shift) currentSpeed *= 0.4;
+                if (keys.w || keys.s) velocity.z -= direction.z * speed * delta;
+                if (keys.a || keys.d) velocity.x -= direction.x * speed * delta;
 
-                if (keys.w || keys.s) velocity.z -= direction.z * currentSpeed * delta;
-                if (keys.a || keys.d) velocity.x -= direction.x * currentSpeed * delta;
+                let moveVector = new THREE.Vector3(velocity.x, 0, velocity.z).applyEuler(camRotation);
+                CoreEngine.ThreeSetup.camera.position.addScaledVector(moveVector, delta);
 
-                // Saglabājam veco pozīciju pirms kustības pielietošanas sienas pārbaudei
-                let vecaPozicijaX = cam.position.x;
-                let vecaPozicijaZ = cam.position.z;
+                // Gravitācija un lēkšana
+                if (CoreEngine.ThreeSetup.camera.position.y > p.eyeHeight) {
+                    p.verticalVelocity -= 22.0 * delta; // Gravitācija
+                    p.canJump = false;
+                } else {
+                    p.verticalVelocity = 0;
+                    CoreEngine.ThreeSetup.camera.position.y = p.eyeHeight;
+                    p.canJump = true;
+                }
 
-                // Pārvietojam kameru lokālajos virzienos
-                cam.moveRight(-velocity.x * delta);
-                cam.moveForward(-velocity.z * delta);
-                cam.position.y = p.eyeHeight;
+                if (keys[' '] && p.canJump) {
+                    p.verticalVelocity = 8.5;
+                }
+                CoreEngine.ThreeSetup.camera.position.y += p.verticalVelocity * delta;
 
-                // 2. SADURSMJU SISTĒMA (Lai neietu cauri sienām)
-                CoreEngine.EnvironmentBuilder.mapStructures.forEach(struct => {
-                    if (cam.position.x + p.radius > struct.minX && cam.position.x - p.radius < struct.maxX &&
-                        cam.position.z + p.radius > struct.minZ && cam.position.z - p.radius < struct.maxZ) {
-                        // Ja notiek sadursme, atgriež spēlētāju atpakaļ
-                        cam.position.x = vecaPozicijaX;
-                        cam.position.z = vecaPozicijaZ;
-                    }
-                });
-
-                // Robežas, lai neizkristu no kartes
-                if (cam.position.x > 110) cam.position.x = 110;
-                if (cam.position.x < -110) cam.position.x = -110;
-                if (cam.position.z > 110) cam.position.z = 110;
-                if (cam.position.z < -110) cam.position.z = -110;
-
-                // Botu un dūmu atjaunināšana
-                CoreEngine.BotIntelligence.update(delta, cam.position, timestamp);
+                // Atjaunojam dūmus un radaru
                 CoreEngine.EnvironmentBuilder.updateSmokes(delta);
+                CoreEngine.BotIntelligence.update(delta, CoreEngine.ThreeSetup.camera.position, performance.now());
+                CoreEngine.InterfaceHUD.renderRadar();
             }
 
-            // Radara zīmēšana HUD saskarnē
-            if (CoreEngine.isLocked) {
-                const ctx = CoreEngine.radarCtx;
-                ctx.clearRect(0, 0, 170, 170);
-                ctx.fillStyle = "#1e293b";
-                
-                // Centrs ir 85, 85
-                CoreEngine.BotIntelligence.bots.forEach(bot => {
-                    if (bot.hp <= 0) return;
-                    let relX = (bot.mesh.position.x - cam.position.x) * 1.2 + 85;
-                    let relZ = (bot.mesh.position.z - cam.position.z) * 1.2 + 85;
-                    ctx.beginPath();
-                    ctx.arc(relX, relZ, 4, 0, Math.PI * 2);
-                    ctx.fillStyle = "#ef4444";
-                    ctx.fill();
-                });
-            }
-
-            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
+            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, CoreEngine.ThreeSetup.camera);
         }
     }
 };
 
-window.onload = () => {
-    CoreEngine.init();
-};
+window.onload = () => { CoreEngine.init(); };
 </script>
 </body>
 </html>
