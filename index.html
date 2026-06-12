@@ -161,13 +161,14 @@
         .instruction-grid strong { color: #f1f5f9; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 </head>
 <body>
 
     <div id="main-dashboard-container">
         <div class="dashboard-panel">
             <h1 id="panel-main-title" style="color: #de9b35; font-size: 64px; margin: 0; font-weight: 900; letter-spacing: 4px;">COUNTER-STRIKE 2</h1>
-            <p id="panel-sub-title" style="color: #64748b; font-size: 19px; margin: 6px 0 30px 0; letter-spacing: 2px;">WEBGL 3D TACTICAL ENGINE / PRO-EDITION</p>
+            <p id="panel-sub-title" style="color: #64748b; font-size: 19px; margin: 6px 0 30px 0; letter-spacing: 2px;">WEBGL 3D TACTICAL ENGINE / MULTIPLAYER</p>
             <button class="action-button" onclick="CoreEngine.requestInterfaceLock()">START MATCH</button>
             <div class="instruction-grid">
                 <strong>W, A, S, D</strong> — Kustība & Taktiskā slīdēšana (Source 2 berze)<br>
@@ -261,6 +262,8 @@ let mouseRotation = new THREE.Euler(0, 0, 0, 'YXZ');
 let lastShotTimestamp = 0;
 let isLeftMousePressed = false;
 let clock = new THREE.Clock();
+let socket = null; // Multiplayer globālais objekts
+let networkPlayers = {}; // Saraksts ar citiem tīkla spēlētājiem
 
 const CoreEngine = {
     isLocked: false,
@@ -303,6 +306,36 @@ const CoreEngine = {
         this.BotIntelligence.spawnSquad();
         this.InputController.bindEvents();
         this.InterfaceHUD.refresh();
+
+        // MULTIPLAYER SAVIENOJUMS (Nomaini ar savu precīzo Render saiti)
+        socket = io("https://cs-go-3.onrender.com");
+
+        socket.on("connect", () => {
+            this.InterfaceHUD.logKillEvent("Savienots ar Multiplayer serveri!");
+        });
+
+        // Klausāmies kad kāds pakustās tīklā
+        socket.on("gajiens", (data) => {
+            if (!networkPlayers[data.id]) {
+                // Ja jauns spēlētājs, izveidojam viņam 3D ķermeni (zilu cilindru)
+                const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+                const mesh = new THREE.Mesh(geo, mat);
+                CoreEngine.ThreeSetup.scene.add(mesh);
+                networkPlayers[data.id] = mesh;
+            }
+            // Kustinam citu spēlētāju
+            networkPlayers[data.id].position.set(data.x, data.y, data.z);
+        });
+
+        // Dzēšam spēlētāju kurš atslēdzas
+        socket.on("user-disconnected", (id) => {
+            if (networkPlayers[id]) {
+                CoreEngine.ThreeSetup.scene.remove(networkPlayers[id]);
+                delete networkPlayers[id];
+            }
+        });
+
         window.requestAnimationFrame((t) => this.EngineLoop.execute(t));
     },
 
@@ -375,7 +408,6 @@ const CoreEngine = {
             ground.receiveShadow = true;
             CoreEngine.ThreeSetup.scene.add(ground);
 
-            // Sienas un kastes
             this.addBlock(0, -115, 230, 14, 4, 0x8c7b64);
             this.addBlock(0, 115, 230, 14, 4, 0x8c7b64);
             this.addBlock(-115, 0, 4, 14, 230, 0x8c7b64);
@@ -447,31 +479,26 @@ const CoreEngine = {
     ProceduralModels: {
         compiledDecks: {},
         compileAll() {
-            // USP-S
             const usp = new THREE.Group();
             const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.045, 0.16), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
             usp.add(b1); usp.position.set(0.15, -0.15, -0.3);
             this.compiledDecks["pistol"] = usp;
 
-            // Deagle
             const de = new THREE.Group();
             const de1 = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.2), new THREE.MeshStandardMaterial({ color: 0x475569 }));
             de.add(de1); de.position.set(0.15, -0.15, -0.35);
             this.compiledDecks["deagle"] = de;
 
-            // M4A4
             const m4 = new THREE.Group();
             const m4b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.065, 0.34), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
             m4.add(m4b); m4.position.set(0.2, -0.2, -0.4);
             this.compiledDecks["m4a4"] = m4;
 
-            // AK-47
             const ak = new THREE.Group();
             const akb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.055, 0.36), new THREE.MeshStandardMaterial({ color: 0x111827 }));
             ak.add(akb); ak.position.set(0.2, -0.2, -0.4);
             this.compiledDecks["ak47"] = ak;
 
-            // AWP
             const awp = new THREE.Group();
             const awpb = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.075, 0.48), new THREE.MeshStandardMaterial({ color: 0x14532d }));
             awp.add(awpb); awp.position.set(0.22, -0.22, -0.5);
@@ -661,6 +688,30 @@ const CoreEngine = {
             }, 1800);
         },
 
+        throwSmokeGrenade() {
+            CoreEngine.EnvironmentBuilder.deploySmoke(CoreEngine.ThreeSetup.camera.position);
+        },
+
+        toggleSniperScope() {
+            const p = CoreEngine.PlayerEntity;
+            p.isScoped = !p.isScoped;
+            const overlay = document.getElementById('sniper-scope-overlay');
+            const ch = document.getElementById('dynamic-crosshair');
+
+            if(p.isScoped) {
+                overlay.style.display = 'block';
+                ch.style.display = 'none';
+                CoreEngine.ThreeSetup.camera.fov = 18;
+                CoreEngine.ThreeSetup.gunAnchor.visible = false;
+            } else {
+                overlay.style.display = 'none';
+                ch.style.display = 'block';
+                CoreEngine.ThreeSetup.camera.fov = 74;
+                CoreEngine.ThreeSetup.gunAnchor.visible = true;
+            }
+            CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
+        },
+
         triggerWeaponShot() {
             const p = CoreEngine.PlayerEntity;
             const w = CoreEngine.WeaponArsenal[p.activeGear];
@@ -675,7 +726,6 @@ const CoreEngine = {
             p.ammoClips[p.activeGear]--;
             CoreEngine.InterfaceHUD.refresh();
 
-            // Vizuālais atsitiens ierocim
             CoreEngine.ThreeSetup.gunAnchor.position.z += w.recoil;
             setTimeout(() => { CoreEngine.ThreeSetup.gunAnchor.position.z = 0; }, 60);
 
@@ -697,40 +747,11 @@ const CoreEngine = {
                         CoreEngine.ThreeSetup.scene.remove(bot.mesh);
                         CoreEngine.scoreCT++;
                         p.money += 300;
-                        CoreEngine.InterfaceHUD.logKillEvent("Likvidēts pretinieks! +$300");
                         CoreEngine.InterfaceHUD.refresh();
+                        CoreEngine.InterfaceHUD.logKillEvent("PRETINIEKS LIKVIDĒTS! +$300");
                     }
                 }
             }
-        },
-
-        toggleSniperScope() {
-            const p = CoreEngine.PlayerEntity;
-            p.isScoped = !p.isScoped;
-            const scope = document.getElementById('sniper-scope-overlay');
-            const crosshair = document.getElementById('dynamic-crosshair');
-
-            if(p.isScoped) {
-                scope.style.display = 'block';
-                crosshair.style.display = 'none';
-                CoreEngine.ThreeSetup.camera.fov = 20;
-                CoreEngine.ThreeSetup.gunAnchor.visible = false;
-            } else {
-                scope.style.display = 'none';
-                crosshair.style.display = 'block';
-                CoreEngine.ThreeSetup.camera.fov = 74;
-                CoreEngine.ThreeSetup.gunAnchor.visible = true;
-            }
-            CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
-        },
-
-        throwSmokeGrenade() {
-            let cam = CoreEngine.ThreeSetup.camera;
-            let targetPos = new THREE.Vector3();
-            cam.getWorldDirection(targetPos);
-            targetPos.multiplyScalar(15).add(cam.position);
-            targetPos.y = 0; // Detonē uz zemes
-            CoreEngine.EnvironmentBuilder.deploySmoke(targetPos);
         }
     },
 
@@ -752,84 +773,57 @@ const CoreEngine = {
             card.innerText = text;
             logger.appendChild(card);
             setTimeout(() => { card.remove(); }, 4500);
-        },
-        renderRadar() {
-            if(!CoreEngine.radarCtx) return;
-            let ctx = CoreEngine.radarCtx;
-            ctx.clearRect(0, 0, 170, 170);
-            
-            let cam = CoreEngine.ThreeSetup.camera;
-            let pX = cam.position.x;
-            let pZ = cam.position.z;
-            
-            // Uzzīmē pretiniekus radarā
-            CoreEngine.BotIntelligence.bots.forEach(bot => {
-                if(bot.hp <= 0) return;
-                let relX = (bot.mesh.position.x - pX) * 0.8 + 85;
-                let relZ = (bot.mesh.position.z - pZ) * 0.8 + 85;
-                
-                ctx.fillStyle = '#ef4444';
-                ctx.beginPath();
-                ctx.arc(relX, relZ, 4, 0, Math.PI * 2);
-                ctx.fill();
-            });
         }
     },
 
     EngineLoop: {
         execute(timestamp) {
-            window.requestAnimationFrame((t) => CoreEngine.EngineLoop.execute(t));
-            let delta = clock.getDelta();
-            if(delta > 0.1) delta = 0.1;
+            window.requestAnimationFrame((t) => this.execute(t));
 
-            if (CoreEngine.isLocked && CoreEngine.PlayerEntity.hp > 0) {
-                // Nepārtrauktā šaušana automātiskajiem ieročiem (AK47, M4A4)
-                if (isLeftMousePressed && CoreEngine.WeaponArsenal[CoreEngine.PlayerEntity.activeGear].auto) {
+            let delta = clock.getDelta();
+            if (delta > 0.1) delta = 0.1;
+
+            const p = CoreEngine.PlayerEntity;
+            const cam = CoreEngine.ThreeSetup.camera;
+
+            if (CoreEngine.isLocked && p.hp > 0) {
+                // Automātiskā šaušana
+                const w = CoreEngine.WeaponArsenal[p.activeGear];
+                if (isLeftMousePressed && w.auto) {
                     CoreEngine.EngineActions.triggerWeaponShot();
                 }
 
-                // Kustības loģika un berze
-                let p = CoreEngine.PlayerEntity;
-                let speed = p.baseSpeed * (keys.shift ? 0.4 : 1.0);
-                
+                // Kustības vadība
                 direction.z = Number(keys.w) - Number(keys.s);
                 direction.x = Number(keys.a) - Number(keys.d);
                 direction.normalize();
 
+                let currentSpeed = p.baseSpeed;
+                if (keys.shift) currentSpeed *= 0.4;
+
                 velocity.x -= velocity.x * 10.0 * delta;
                 velocity.z -= velocity.z * 10.0 * delta;
 
-                let camRotation = new THREE.Euler().setFromQuaternion(CoreEngine.ThreeSetup.camera.quaternion, 'YXZ');
-                camRotation.x = 0; // Bloķē vertikālo rotāciju kustībai
+                if (keys.w || keys.s) velocity.z -= direction.z * currentSpeed * delta;
+                if (keys.a || keys.d) velocity.x -= direction.x * currentSpeed * delta;
 
-                if (keys.w || keys.s) velocity.z -= direction.z * speed * delta;
-                if (keys.a || keys.d) velocity.x -= direction.x * speed * delta;
+                cam.translateX(-velocity.x * delta);
+                cam.translateZ(-velocity.z * delta);
+                cam.position.y = p.eyeHeight;
 
-                let moveVector = new THREE.Vector3(velocity.x, 0, velocity.z).applyEuler(camRotation);
-                CoreEngine.ThreeSetup.camera.position.addScaledVector(moveVector, delta);
-
-                // Gravitācija un lēkšana
-                if (CoreEngine.ThreeSetup.camera.position.y > p.eyeHeight) {
-                    p.verticalVelocity -= 22.0 * delta; // Gravitācija
-                    p.canJump = false;
-                } else {
-                    p.verticalVelocity = 0;
-                    CoreEngine.ThreeSetup.camera.position.y = p.eyeHeight;
-                    p.canJump = true;
+                // SŪTĀM KOORDINĀTAS UZ SERVERI (Multiplayer reāllaika daļa)
+                if (socket && socket.connected) {
+                    socket.emit("gajiens", {
+                        x: cam.position.x,
+                        y: cam.position.y,
+                        z: cam.position.z
+                    });
                 }
-
-                if (keys[' '] && p.canJump) {
-                    p.verticalVelocity = 8.5;
-                }
-                CoreEngine.ThreeSetup.camera.position.y += p.verticalVelocity * delta;
-
-                // Atjaunojam dūmus un radaru
-                CoreEngine.EnvironmentBuilder.updateSmokes(delta);
-                CoreEngine.BotIntelligence.update(delta, CoreEngine.ThreeSetup.camera.position, performance.now());
-                CoreEngine.InterfaceHUD.renderRadar();
             }
 
-            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, CoreEngine.ThreeSetup.camera);
+            CoreEngine.EnvironmentBuilder.updateSmokes(delta);
+            CoreEngine.BotIntelligence.update(delta, cam.position, timestamp);
+            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
         }
     }
 };
