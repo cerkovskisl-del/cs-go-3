@@ -3,304 +3,271 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS2 2D Top-Down Simulator</title>
+    <title>CS2 3D Web Offline Prototips</title>
     <style>
-        body {
-            background-color: #121316;
-            color: #f3f4f6;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
+        body, html {
             margin: 0;
-            padding: 10px;
-            user-select: none;
+            padding: 0;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            font-family: sans-serif;
         }
-        .hud {
-            display: flex;
-            justify-content: space-around;
-            max-width: 800px;
-            margin: 10px auto;
-            background: rgba(30, 41, 59, 0.8);
-            padding: 10px;
-            border-radius: 6px;
-            border-bottom: 3px solid #de9b35;
+        #hud {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 30px;
+            border-radius: 5px;
+            font-size: 24px;
             font-weight: bold;
-            font-size: 18px;
+            pointer-events: none;
+            border-bottom: 3px solid #de9b35;
         }
-        canvas {
-            background-color: #23272a;
-            border: 3px solid #3e444b;
-            display: block;
-            margin: 0 auto;
-            cursor: crosshair;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
-        .controls-hint {
-            color: #9ca3af;
-            font-size: 14px;
-            margin-top: 8px;
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 255, 0, 0.8);
+        }
+        #crosshair::before { top: 4px; left: -10px; width: 30px; height: 2px; }
+        #crosshair::after { top: -10px; left: 4px; width: 2px; height: 30px; }
+        
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
 
-    <div class="hud">
-        <div style="color: #60a5fa;">CT (Tu): <span id="score">0</span></div>
-        <div style="color: #ef4444;">DZĪVĪBAS: <span id="health">100</span>%</div>
-        <div style="color: #fbbf24;">IEROCIS: <span id="ammo">30/90</span> (M4A1-S)</div>
+    <div id="blocker">
+        <h1 style="color: #de9b35;">CS2 3D OFFLINE SIMULATORS</h1>
+        <p>Noklikšķini uz ekrāna, lai sāktu spēli</p>
+        <p style="color: #aaa; font-size: 14px;">Kustība: WASD | Tēmēšana: Pele | Šaušana: Kreisais klikšķis</p>
     </div>
 
-    <canvas id="csGame" width="800" height="500"></canvas>
-    
-    <div class="controls-hint">
-        Kustība: <strong>WASD</strong> | Tēmēšana: <strong>Pele</strong> | Šaušana: <strong>Kreisais klikšķis</strong> | Pārlādēt: <strong>R</strong>
-    </div>
+    <div id="crosshair"></div>
+    <div id="hud">PUNKTI: <span id="score">0</span></div>
 
 <script>
-    const canvas = document.getElementById("csGame");
-    const ctx = canvas.getContext("2d");
+    // --- Kontroles mehānika (PointerLock) ---
+    const blocker = document.getElementById('blocker');
+    let isLocked = false;
 
-    // Spēlētāja (CT) iestatījumi
-    const player = {
-        x: 400,
-        y: 250,
-        radius: 14,
-        angle: 0,
-        speed: 3.5,
-        health: 100,
-        score: 0,
-        ammo: 30,
-        maxAmmo: 30,
-        reserveAmmo: 90,
-        isReloading: false
-    };
+    document.body.addEventListener('click', () => {
+        document.body.requestPointerLock();
+    });
 
-    const keys = {};
-    const bullets = [];
+    document.addEventListener('pointerlockchange', () => {
+        if (document.pointerLockElement === document.body) {
+            blocker.style.display = 'none';
+            isLocked = true;
+        } else {
+            blocker.style.display = 'flex';
+            isLocked = false;
+        }
+    });
+
+    // --- 3D Spēles Inicializācija ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a222d); // CS2 stila pelēkzilas debesis
+    scene.fog = new THREE.FogExp2(0x1a222d, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Apgaismojums
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(20, 40, 20);
+    scene.add(dirLight);
+
+    // Zeme (Spēles karte / "Dust 2" grīda)
+    const floorGeo = new THREE.PlaneGeometry(100, 100);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x554d43 }); // Smilšu krāsa
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // Spēlētāja sākuma pozīcija
+    camera.position.y = 2; // Acu augstums
+
+    // --- Ieroča modelis (Vienkāršs 3D bloks ekrāna stūrī) ---
+    const gunGeo = new THREE.BoxGeometry(0.1, 0.1, 0.5);
+    const gunMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const gun = new THREE.Mesh(gunGeo, gunMat);
+    scene.add(gun);
+
+    // --- Kustības mainīgie ---
+    const keys = { w: false, a: false, s: false, d: false };
+    const velocity = new THREE.Vector3();
+    const direction = new THREE.Vector3();
+    
+    // Peles rotācijas sekošana
+    let yaw = 0;
+    let pitch = 0;
+
+    document.addEventListener('keydown', (e) => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = true; });
+    document.addEventListener('keyup', (e) => { if(keys.hasOwnProperty(e.key.toLowerCase())) keys[e.key.toLowerCase()] = false; });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isLocked) return;
+        
+        // Pagriež kameru pēc peles kustības
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        
+        // Ierobežo skatu uz augšu/leju (kā īstā FPS)
+        pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
+        
+        camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
+    });
+
+    // --- Botu (Mērķu) izveide ---
     const bots = [];
-    const particles = []; // Asins un šaušanas efekti
+    let score = 0;
 
-    // Peles un tastatūras klausītāji
-    window.addEventListener('keydown', e => {
-        keys[e.key.toLowerCase()] = true;
-        if (e.key.toLowerCase() === 'r') reloadWeapon();
-    });
-    window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    const mouse = { x: 0, y: 0 };
-    canvas.addEventListener('mousemove', e => {
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = e.clientX - rect.left;
-        mouse.y = e.clientY - rect.top;
-    });
-
-    // Šaušanas loģika
-    canvas.addEventListener('mousedown', e => {
-        if (e.button === 0 && player.ammo > 0 && !player.isReloading && player.health > 0) {
-            player.ammo--;
-            updateHUD();
-
-            // Pievieno nelielu nejaušu atsitienu (Recoil Spread)
-            const spread = (Math.random() - 0.5) * 0.12;
-            const finalAngle = player.angle + spread;
-
-            bullets.push({
-                x: player.x + Math.cos(player.angle) * player.radius,
-                y: player.y + Math.sin(player.angle) * player.radius,
-                dx: Math.cos(finalAngle) * 11,
-                dy: Math.sin(finalAngle) * 11
-            });
-
-            // Muzzle Flash efekts (stobra liesma)
-            createParticle(player.x + Math.cos(player.angle) * 20, player.y + Math.sin(player.angle) * 20, '#fbbf24', 4);
-        }
-    });
-
-    function reloadWeapon() {
-        if (!player.isReloading && player.ammo < player.maxAmmo && player.reserveAmmo > 0) {
-            player.isReloading = true;
-            document.getElementById("ammo").innerText = "PĀRLĀDĒ...";
-            setTimeout(() => {
-                const needed = player.maxAmmo - player.ammo;
-                const toTransfer = Math.min(needed, player.reserveAmmo);
-                player.ammo += toTransfer;
-                player.reserveAmmo -= toTransfer;
-                player.isReloading = false;
-                updateHUD();
-            }, 1500); // 1.5 sekundes pārlāde
-        }
-    }
-
-    function updateHUD() {
-        document.getElementById("score").innerText = player.score;
-        document.getElementById("health").innerText = Math.max(0, Math.ceil(player.health));
-        if (!player.isReloading) {
-            document.getElementById("ammo").innerText = `${player.ammo}/${player.reserveAmmo}`;
-        }
-    }
-
-    // Efektu daļiņu ģenerators (Asinis/Uzliesmojumi)
-    function createParticle(x, y, color, count) {
-        for (let i = 0; i < count; i++) {
-            particles.push({
-                x: x, y: y,
-                dx: (Math.random() - 0.5) * 4,
-                dy: (Math.random() - 0.5) * 4,
-                radius: Math.random() * 3 + 1,
-                color: color,
-                alpha: 1
-            });
-        }
-    }
-
-    // Botu (Terroristu) izveide
     function spawnBot() {
-        if (player.health > 0 && bots.length < 4) {
-            // Boti parādās nejaušās vietās ekrāna malās
-            const side = Math.floor(Math.random() * 4);
-            let x, y;
-            if (side === 0) { x = Math.random() * canvas.width; y = -20; }
-            else if (side === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; }
-            else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
-            else { x = -20; y = Math.random() * canvas.height; }
-
-            bots.push({ x: x, y: y, radius: 14, speed: 1.8, health: 100 });
-        }
-    }
-    setInterval(spawnBot, 1800);
-
-    // Galvenais spēles cikls
-    function loop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Ja spēlētājs ir miris
-        if (player.health <= 0) {
-            ctx.fillStyle = "#ef4444";
-            ctx.font = "bold 40px sans-serif";
-            ctx.fillText("WASTED / K.I.A.", canvas.width / 2 - 140, canvas.height / 2);
-            ctx.fillStyle = "#ffffff";
-            ctx.font = "20px sans-serif";
-            ctx.fillText("Pārlādē lapu, lai sāktu no jauna", canvas.width / 2 - 140, canvas.height / 2 + 40);
-            return;
-        }
-
-        // 1. Spēlētāja kustība (WASD)
-        if (keys['w'] && player.y > player.radius) player.y -= player.speed;
-        if (keys['s'] && player.y < canvas.height - player.radius) player.y += player.speed;
-        if (keys['a'] && player.x > player.radius) player.x -= player.speed;
-        if (keys['d'] && player.x < canvas.width - player.radius) player.x += player.speed;
-
-        // Spēlētāja skata leņķis pret peli
-        player.angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-
-        // ZĪMĒ SPĒLĒTĀJU (CT - zils modelis ar ieroci)
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        ctx.rotate(player.angle);
+        const botGeo = new THREE.BoxGeometry(2, 3, 2); // Cilvēka izmēra kubs
+        const botMat = new THREE.MeshStandardMaterial({ color: 0xef4444 }); // Teroristu sarkanais
+        const bot = new THREE.Mesh(botGeo, botMat);
         
-        // Ierocis (M4A1-S stobrs)
-        ctx.fillStyle = "#1e293b";
-        ctx.fillRect(10, 4, 18, 5);
+        // Novieto botu nejaušā vietā uz kartes
+        bot.position.x = (Math.random() - 0.5) * 60;
+        bot.position.z = (Math.random() - 0.5) * 60;
+        bot.position.y = 1.5; // Uz zemes
         
-        // Spēlētāja ķermenis
-        ctx.beginPath();
-        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-        ctx.fillStyle = "#3b82f6"; // CT Zilā krāsa
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "#1d4ed8";
-        ctx.stroke();
-        ctx.closePath();
-        ctx.restore();
-
-        // 2. Ložu kustība
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            const b = bullets[i];
-            b.x += b.dx;
-            b.y += b.dy;
-
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = "#fbbf24";
-            ctx.fill();
-            ctx.closePath();
-
-            // Izdzēš lodes ārpus karšu robežām
-            if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
-                bullets.splice(i, 1);
-            }
-        }
-
-        // 3. Botu apstrāde (T - Teroristi)
-        for (let i = bots.length - 1; i >= 0; i--) {
-            const bot = bots[i];
-            const botAngle = Math.atan2(player.y - bot.y, player.x - bot.x);
-
-            // Kustība uz spēlētāja pozīciju
-            bot.x += Math.cos(botAngle) * bot.speed;
-            bot.y += Math.sin(botAngle) * bot.speed;
-
-            // ZĪMĒ BOTU (T - Oranžs/Sarkans modelis)
-            ctx.save();
-            ctx.translate(bot.x, bot.y);
-            ctx.rotate(botAngle);
-            // Bota ierocis (AK-47)
-            ctx.fillStyle = "#451a03";
-            ctx.fillRect(10, 4, 16, 5);
-            // Bota ķermenis
-            ctx.beginPath();
-            ctx.arc(0, 0, bot.radius, 0, Math.PI * 2);
-            ctx.fillStyle = "#ea580c"; // T Oranžā krāsa
-            ctx.fill();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#c2410c";
-            ctx.stroke();
-            ctx.restore();
-
-            // Sadursme ar spēlētāju (boti nodara kaitējumu)
-            const dist = Math.hypot(player.x - bot.x, player.y - bot.y);
-            if (dist < player.radius + bot.radius) {
-                player.health -= 0.4; // CT zaudē HP
-                updateHUD();
-            }
-
-            // Pārbauda vai spēlētāja lode trāpa botam
-            for (let j = bullets.length - 1; j >= 0; j--) {
-                const b = bullets[j];
-                const hitDist = Math.hypot(bot.x - b.x, bot.y - b.y);
-
-                if (hitDist < bot.radius + 3) {
-                    createParticle(bot.x, bot.y, '#ef4444', 5); // Asins efekts
-                    bullets.splice(j, 1);
-                    bots.splice(i, 1);
-                    player.score += 100; // +100$ vai punkti par kill
-                    updateHUD();
-                    break;
-                }
-            }
-        }
-
-        // 4. Daļiņu (efektu) animācija
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i];
-            p.x += p.dx;
-            p.y += p.dy;
-            p.alpha -= 0.04;
-
-            ctx.save();
-            ctx.globalAlpha = p.alpha;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            ctx.fillStyle = p.color;
-            ctx.fill();
-            ctx.restore();
-
-            if (p.alpha <= 0) particles.splice(i, 1);
-        }
-
-        requestAnimationFrame(loop);
+        scene.add(bot);
+        bots.push(bot);
     }
 
-    loop();
+    // Izveidojam pirmos 5 botus
+    for(let i=0; i<6; i++) spawnBot();
+
+    // --- Šaušanas mehānika ---
+    const raycaster = new THREE.Raycaster();
+    
+    document.addEventListener('mousedown', (e) => {
+        if (!isLocked || e.button !== 0) return;
+
+        // Ieroča "atpakaļatgriešanās" efekts (recoil animācija)
+        gun.position.z += 0.1;
+
+        // Šaujam taisni no kameras centra
+        raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const intersects = raycaster.intersectObjects(bots);
+
+        if (intersects.length > 0) {
+            const hitBot = intersects[0].object;
+            
+            // Efekts: nomainām bota krāsu uz mirkli pirms izdzēšanas
+            hitBot.material.color.setHex(0xffffff);
+            
+            setTimeout(() => {
+                scene.remove(hitBot);
+                const index = bots.indexOf(hitBot);
+                if (index > -1) bots.splice(index, 1);
+                
+                score += 100;
+                document.getElementById('score').innerText = score;
+                
+                // Izveidojam jaunu botu mirušā vietā
+                spawnBot();
+            }, 100);
+        }
+    });
+
+    // Loga izmēra maiņa
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Galvenais 3D renderēšanas cikls ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+
+        if (isLocked) {
+            // 1. Kustības aprēķins
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+
+            direction.z = Number(keys.w) - Number(keys.s);
+            direction.x = Number(keys.d) - Number(keys.a);
+            direction.normalize();
+
+            // Pārvietošanās attiecībā pret kameras skata virzienu
+            const camDirection = new THREE.Vector3();
+            camera.getWorldDirection(camDirection);
+            camDirection.y = 0; // Neļauj lidot uz augšu skatoties debesīs
+            camDirection.normalize();
+
+            const camSide = new THREE.Vector3();
+            camSide.crossVectors(camera.up, camDirection).normalize();
+
+            if (keys.w || keys.s) velocity.addScaledVector(camDirection, direction.z * 40.0 * delta);
+            if (keys.a || keys.d) velocity.addScaledVector(camSide, direction.x * 40.0 * delta);
+
+            camera.position.addScaledVector(velocity, delta);
+            
+            // Neļauj izkrist cauri zemei
+            camera.position.y = 2; 
+
+            // 2. Ieroča pozicionēšana (piesaistīts kamerai)
+            gun.position.copy(camera.position);
+            gun.quaternion.copy(camera.quaternion);
+            // Nobīdām ieroci uz leju un pa labi, lai tas izskatītos kā FPS spēlē
+            gun.translateZ(-0.6);
+            gun.translateX(0.2);
+            gun.translateY(-0.25);
+            
+            // Maiga ieroča atgriešanās pēc šāviena
+            gun.position.z = THREE.MathUtils.lerp(gun.position.z, 0, 0.1);
+
+            // 3. Botu loģika (Boti lēnām kustas uz spēlētāja pusi)
+            bots.forEach(bot => {
+                const dirToPlayer = new THREE.Vector3().subVectors(camera.position, bot.position);
+                dirToPlayer.y = 0;
+                dirToPlayer.normalize();
+                bot.position.addScaledVector(dirToPlayer, 2.0 * delta); // Botu ātrums
+            });
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    animate();
 </script>
 
 </body>
