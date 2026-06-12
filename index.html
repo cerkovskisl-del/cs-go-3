@@ -326,7 +326,10 @@ const GameCore = {
     },
 
     RequestPointerLock() {
-        document.body.requestPointerLock();
+        // LABOTS: Piesaistām pie renderera domElement nevis body, lai pārlūks neiesaldē kadru zīmēšanu
+        if (this.ThreeGraphicsManager.webGlRenderer) {
+            this.ThreeGraphicsManager.webGlRenderer.domElement.requestPointerLock();
+        }
     },
 
     StartMatchCountdownTimer() {
@@ -595,6 +598,7 @@ const GameCore = {
             }
         },
 
+        // LABOTS: Pilnībā pabeigta un atjaunota botu kustības un uzbrukuma loģika
         CoordinateBehavioralDecisions(globalDeltaTime, playerCurrentPosition) {
             const currentTimestamp = performance.now();
             
@@ -603,92 +607,64 @@ const GameCore = {
 
                 botEntity.meshInstance.lookAt(playerCurrentPosition.x, botEntity.meshInstance.position.y, playerCurrentPosition.z);
                 
-                if (currentTimestamp - botEntity.lastDecisionEpoch > 4000) {
-                    botEntity.lastDecisionEpoch = currentTimestamp;
-                    let distanceToTargetPlayer = botEntity.meshInstance.position.distanceTo(playerCurrentPosition);
-                    
-                    if (distanceToTargetPlayer < 75.0 && Math.random() > 0.3) {
-                        botEntity.movementTargetNode.copy(playerCurrentPosition);
-                    } else {
-                        let randomExplorationOffsetRadius = 40;
-                        botEntity.movementTargetNode.set(
-                            botEntity.meshInstance.position.x + (Math.random() - 0.5) * randomExplorationOffsetRadius,
-                            1.15,
-                            botEntity.meshInstance.position.z + (Math.random() - 0.5) * randomExplorationOffsetRadius
-                        );
-                    }
-                }
-
-                let pathingDirectionVector = new THREE.Vector3().subVectors(botEntity.movementTargetNode, botEntity.meshInstance.position);
-                pathingDirectionVector.y = 0;
-                let stepLengthDistance = pathingDirectionVector.length();
+                let distanceToTargetPlayer = botEntity.meshInstance.position.distanceTo(playerCurrentPosition);
                 
-                if (stepLengthDistance > 1.5) {
-                    pathingDirectionVector.normalize();
-                    let potentialNextPosition = botEntity.meshInstance.position.clone().addScaledVector(pathingDirectionVector, botEntity.patrolSpeedVelocity * globalDeltaTime);
-                    let localCollisionDetected = false;
-                    
-                    let temporaryBotBox = new THREE.Box3().setFromCenterAndSize(potentialNextPosition, new THREE.Vector3(1.3, 2.3, 1.3));
-
-                    for (let idx = 0; idx < GameCore.ProceduralMapArchitect.staticCollisionBoxes.length; idx++) {
-                        if (temporaryBotBox.intersectsBox(GameCore.ProceduralMapArchitect.staticCollisionBoxes[idx])) {
-                            localCollisionDetected = true;
-                            break;
+                // Ja bots ir tuvu spēlētājam, tas uzbrūk
+                if (distanceToTargetPlayer < 3.0) {
+                    if (currentTimestamp - botEntity.lastDecisionEpoch > 1500) {
+                        botEntity.lastDecisionEpoch = currentTimestamp;
+                        GameCore.PlayerDataStructure.currentHp -= 15;
+                        GameCore.UserInterfaceHUD.TriggerDamageIndicatorFlash();
+                        GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
+                        
+                        if (GameCore.PlayerDataStructure.currentHp <= 0) {
+                            GameCore.PlayerDataStructure.currentHp = 100;
+                            GameCore.PlayerDataStructure.availableCash = Math.max(0, GameCore.PlayerDataStructure.availableCash - 1000);
+                            GameCore.ThreeGraphicsManager.cameraInstance.position.set(0, GameCore.PlayerDataStructure.cameraEyeHeightLevel, 60);
+                            cameraEulerRotation.set(0,0,0);
+                            GameCore.UserInterfaceHUD.PushCombatEventNotification("💀 You were eliminated by Enemy AI.");
+                            GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
                         }
                     }
-
-                    if (!localCollisionDetected) {
-                        botEntity.meshInstance.position.copy(potentialNextPosition);
-                    } else {
-                        botEntity.lastDecisionEpoch = 0;
-                    }
-                }
-
-                if (Math.random() < 0.0035) {
-                    let distanceToTargetPlayer = botEntity.meshInstance.position.distanceTo(playerCurrentPosition);
-                    if (distanceToTargetPlayer < 60.0) {
-                        GameCore.EngineProcessingCycle.InflictDamageOnPlayerEntity(12);
-                    }
+                } else {
+                    // Bots skrien spēlētāja virzienā
+                    let forwardMoveVector = new THREE.Vector3().subVectors(playerCurrentPosition, botEntity.meshInstance.position);
+                    forwardMoveVector.y = 0;
+                    forwardMoveVector.normalize();
+                    botEntity.meshInstance.position.addScaledVector(forwardMoveVector, botEntity.patrolSpeedVelocity * globalDeltaTime);
                 }
             });
         }
     },
 
     InventoryManager: {
-        PurchaseWeapon(weaponRegistryId) {
-            const specItem = GameCore.WeaponArsenalRegistry[weaponRegistryId];
-            const pEntity = GameCore.PlayerDataStructure;
-            
-            if (pEntity.availableCash >= specItem.cost) {
-                pEntity.availableCash -= specItem.cost;
-                pEntity.equippedWeaponId = weaponRegistryId;
-                pEntity.ammoClipsInMagazines[weaponRegistryId] = specItem.clipCapacity;
-                pEntity.ammoReserveStorage[weaponRegistryId] = specItem.reserveCapacity;
-                
-                pEntity.isOpticsScoped = false;
-                GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
-                GameCore.ThreeGraphicsManager.cameraInstance.updateProjectionMatrix();
+        PurchaseWeapon(weaponId) {
+            const weaponSpec = GameCore.WeaponArsenalRegistry[weaponId];
+            if (GameCore.PlayerDataStructure.availableCash >= weaponSpec.cost) {
+                GameCore.PlayerDataStructure.availableCash -= weaponSpec.cost;
+                GameCore.PlayerDataStructure.equippedWeaponId = weaponId;
+                GameCore.PlayerDataStructure.isOpticsScoped = false;
                 document.getElementById('sniper-scope-view').style.display = 'none';
+                if(GameCore.isEnginePointerLocked) document.getElementById('tactical-crosshair').style.display = 'block';
                 
-                GameCore.WeaponModelFactory.MountToCameraAnchor(weaponRegistryId);
-                GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
-                GameCore.UserInterfaceHUD.PushCombatEventNotification(`🛒 Purchased: ${specItem.name}`);
+                GameCore.WeaponModelFactory.MountToCameraAnchor(weaponId);
+                GameCore.UserInterfaceHUD.PushCombatEventNotification(`🛒 Purchased: ${weaponSpec.name}`);
                 this.CloseBuyMenu();
+                GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
             } else {
-                GameCore.UserInterfaceHUD.PushCombatEventNotification("❌ Critical Error: Insufficient Financial Capital reserves!");
+                GameCore.UserInterfaceHUD.PushCombatEventNotification("❌ Insufficient funds for this asset!");
             }
         },
-
         OpenBuyMenu() {
+            if(!GameCore.isEnginePointerLocked) return;
             GameCore.isEquipmentMenuOpen = true;
-            GameCore.isEnginePointerLocked = false;
-            document.exitPointerLock();
             document.getElementById('buy-menu-overlay').style.display = 'flex';
+            document.getElementById('tactical-crosshair').style.display = 'none';
+            document.exitPointerLock();
         },
-
         CloseBuyMenu() {
-            document.getElementById('buy-menu-overlay').style.display = 'none';
             GameCore.isEquipmentMenuOpen = false;
+            document.getElementById('buy-menu-overlay').style.display = 'none';
             GameCore.RequestPointerLock();
         }
     },
@@ -696,336 +672,350 @@ const GameCore = {
     InteractionInputRouter: {
         RegisterHardwareEvents() {
             document.addEventListener('pointerlockchange', () => {
-                const gameHudViewNode = document.getElementById('game-hud');
-                const targetCrosshairViewNode = document.getElementById('tactical-crosshair');
-                const outerDashboardViewNode = document.getElementById('main-menu-dashboard');
-
-                if (document.pointerLockElement === document.body) {
-                    outerDashboardViewNode.style.display = 'none';
-                    gameHudViewNode.style.display = 'block';
-                    if(!GameCore.PlayerDataStructure.isOpticsScoped) {
-                        targetCrosshairViewNode.style.display = 'block';
-                    }
+                if (document.pointerLockElement === GameCore.ThreeGraphicsManager.webGlRenderer.domElement) {
                     GameCore.isEnginePointerLocked = true;
+                    document.getElementById('main-menu-dashboard').style.display = 'none';
+                    document.getElementById('game-hud').style.display = 'block';
+                    if(!GameCore.PlayerDataStructure.isOpticsScoped) {
+                        document.getElementById('tactical-crosshair').style.display = 'block';
+                    }
                 } else {
                     GameCore.isEnginePointerLocked = false;
-                    targetCrosshairViewNode.style.display = 'none';
+                    document.getElementById('tactical-crosshair').style.display = 'none';
                     if (!GameCore.isEquipmentMenuOpen) {
-                        outerDashboardViewNode.style.display = 'flex';
+                        document.getElementById('main-menu-dashboard').style.display = 'flex';
+                        document.getElementById('game-hud').style.display = 'none';
+                        document.getElementById('sniper-scope-view').style.display = 'none';
+                        GameCore.PlayerDataStructure.isOpticsScoped = false;
                     }
                 }
             });
 
             document.addEventListener('mousemove', (mouseEvent) => {
                 if (!GameCore.isEnginePointerLocked) return;
-                let lookSensitivityScalar = GameCore.PlayerDataStructure.isOpticsScoped ? 0.0006 : 0.0022;
                 
-                cameraEulerRotation.y -= mouseEvent.movementX * lookSensitivityScalar;
-                cameraEulerRotation.x -= mouseEvent.movementY * lookSensitivityScalar;
-                
-                let verticalLookLimit = Math.PI / 2.15;
-                cameraEulerRotation.x = Math.max(-verticalLookLimit, Math.min(verticalLookLimit, cameraEulerRotation.x));
-                GameCore.ThreeGraphicsManager.cameraInstance.quaternion.setFromEuler(cameraEulerRotation);
+                let sensitivityCoefficient = 0.0022;
+                if(GameCore.PlayerDataStructure.isOpticsScoped) sensitivityCoefficient = 0.0005;
+
+                cameraEulerRotation.y -= mouseEvent.movementX * sensitivityCoefficient;
+                cameraEulerRotation.x -= mouseEvent.movementY * sensitivityCoefficient;
+                cameraEulerRotation.x = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, cameraEulerRotation.x));
             });
 
-            document.addEventListener('keydown', (keyboardEvent) => {
-                const standardizedKey = keyboardEvent.key.toLowerCase();
-                if (standardizedKey === 'w' || standardizedKey === 'arrowup') inputKeys.w = true;
-                if (standardizedKey === 'a' || standardizedKey === 'arrowleft') inputKeys.a = true;
-                if (standardizedKey === 's' || standardizedKey === 'arrowdown') inputKeys.s = true;
-                if (standardizedKey === 'd' || standardizedKey === 'arrowright') inputKeys.d = true;
-                if (standardizedKey === ' ') inputKeys[' '] = true;
-                if (keyboardEvent.key === 'Shift') inputKeys.shift = true;
+            document.addEventListener('keydown', (e) => {
+                let lowerKey = e.key.toLowerCase();
+                if (lowerKey in inputKeys) inputKeys[lowerKey] = true;
+                if (e.key === ' ') inputKeys[' '] = true;
+                if (e.key === 'Shift') inputKeys['shift'] = true;
                 
-                if (GameCore.isEnginePointerLocked) {
-                    if (standardizedKey === 'r') GameCore.EngineProcessingCycle.InitiateWeaponReloadSequence();
-                    if (standardizedKey === 'b') GameCore.InventoryManager.OpenBuyMenu();
-                    if (standardizedKey === 'o') GameCore.EngineProcessingCycle.DeploySmokeScreenUtility();
+                if (lowerKey === 'b') {
+                    if (GameCore.isEquipmentMenuOpen) GameCore.InventoryManager.CloseBuyMenu();
+                    else GameCore.InventoryManager.OpenBuyMenu();
                 }
-            });
-
-            document.addEventListener('keyup', (keyboardEvent) => {
-                const standardizedKey = keyboardEvent.key.toLowerCase();
-                if (standardizedKey === 'w' || standardizedKey === 'arrowup') inputKeys.w = false;
-                if (standardizedKey === 'a' || standardizedKey === 'arrowleft') inputKeys.a = false;
-                if (standardizedKey === 's' || standardizedKey === 'arrowdown') inputKeys.s = false;
-                if (standardizedKey === 'd' || standardizedKey === 'arrowright') inputKeys.d = false;
-                if (standardizedKey === ' ') inputKeys[' '] = false;
-                if (keyboardEvent.key === 'Shift') inputKeys.shift = false;
-            });
-
-            document.addEventListener('mousedown', (mouseClickEvent) => {
-                if (!GameCore.isEnginePointerLocked) return;
-                if (mouseClickEvent.button === 0) {
-                    primaryMousePressed = true;
-                    if (!GameCore.WeaponArsenalRegistry[GameCore.PlayerDataStructure.equippedWeaponId].isFullyAutomatic) {
-                        GameCore.EngineProcessingCycle.ExecuteBallisticRaycastDischarge();
+                
+                if (lowerKey === 'r') GameCore.ExecutionCombatLogic.TriggerWeaponReloadSequence();
+                
+                if (lowerKey === 'o') {
+                    if (GameCore.isEnginePointerLocked && !GameCore.isEquipmentMenuOpen) {
+                        let currentCam = GameCore.ThreeGraphicsManager.cameraInstance;
+                        let directionVector = new THREE.Vector3();
+                        currentCam.getWorldDirection(directionVector);
+                        GameCore.ProceduralMapArchitect.DeployTacticalSmokeVolumetric(currentCam.position, directionVector);
+                        GameCore.UserInterfaceHUD.PushCombatEventNotification("💨 Tactical Smoke Screen deployed.");
                     }
                 }
-                if (mouseClickEvent.button === 2) {
-                    GameCore.EngineProcessingCycle.ToggleMechanicalOpticsScope();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                let lowerKey = e.key.toLowerCase();
+                if (lowerKey in inputKeys) inputKeys[lowerKey] = false;
+                if (e.key === ' ') inputKeys[' '] = false;
+                if (e.key === 'Shift') inputKeys['shift'] = false;
+            });
+
+            document.addEventListener('mousedown', (mouseEvent) => {
+                if (!GameCore.isEnginePointerLocked || GameCore.isEquipmentMenuOpen) return;
+                
+                if (mouseEvent.button === 0) {
+                    primaryMousePressed = true;
+                    GameCore.ExecutionCombatLogic.ExecuteWeaponDischargeRaycast();
+                }
+                if (mouseEvent.button === 2) {
+                    if (GameCore.PlayerDataStructure.equippedWeaponId === "awp") {
+                        GameCore.PlayerDataStructure.isOpticsScoped = !GameCore.PlayerDataStructure.isOpticsScoped;
+                        if (GameCore.PlayerDataStructure.isOpticsScoped) {
+                            document.getElementById('sniper-scope-view').style.display = 'block';
+                            document.getElementById('tactical-crosshair').style.display = 'none';
+                            GameCore.ThreeGraphicsManager.cameraInstance.fov = 18;
+                        } else {
+                            document.getElementById('sniper-scope-view').style.display = 'none';
+                            document.getElementById('tactical-crosshair').style.display = 'block';
+                            GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
+                        }
+                        GameCore.ThreeGraphicsManager.cameraInstance.updateProjectionMatrix();
+                    }
                 }
             });
 
-            document.addEventListener('mouseup', (mouseReleaseEvent) => {
-                if (mouseReleaseEvent.button === 0) primaryMousePressed = false;
+            document.addEventListener('mouseup', (mouseEvent) => {
+                if (mouseEvent.button === 0) primaryMousePressed = false;
             });
+            
+            document.addEventListener('contextmenu', e => e.preventDefault());
+        }
+    },
 
-            document.addEventListener('contextmenu', eventNode => eventNode.preventDefault());
+    ExecutionCombatLogic: {
+        TriggerWeaponReloadSequence() {
+            const structure = GameCore.PlayerDataStructure;
+            if (structure.isCurrentlyReloading) return;
+            
+            const activeWeapon = GameCore.WeaponArsenalRegistry[structure.equippedWeaponId];
+            if (structure.ammoClipsInMagazines[structure.equippedWeaponId] === activeWeapon.clipCapacity) return;
+            if (structure.ammoReserveStorage[structure.equippedWeaponId] <= 0) return;
+
+            structure.isCurrentlyReloading = true;
+            structure.isOpticsScoped = false;
+            document.getElementById('sniper-scope-view').style.display = 'none';
+            if(GameCore.isEnginePointerLocked) document.getElementById('tactical-crosshair').style.display = 'block';
+            GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
+            GameCore.ThreeGraphicsManager.cameraInstance.updateProjectionMatrix();
+
+            GameCore.UserInterfaceHUD.PushCombatEventNotification("🔄 Swapping magazines...");
+            
+            setTimeout(() => {
+                const ammoNeeded = activeWeapon.clipCapacity - structure.ammoClipsInMagazines[structure.equippedWeaponId];
+                const poolAvailable = structure.ammoReserveStorage[structure.equippedWeaponId];
+                const transferCount = Math.min(ammoNeeded, poolAvailable);
+                
+                structure.ammoClipsInMagazines[structure.equippedWeaponId] += transferCount;
+                structure.ammoReserveStorage[structure.equippedWeaponId] -= transferCount;
+                structure.isCurrentlyReloading = false;
+                GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
+            }, 1800);
+        },
+
+        ExecuteWeaponDischargeRaycast() {
+            const structure = GameCore.PlayerDataStructure;
+            if (structure.isCurrentlyReloading) return;
+            
+            const activeWeapon = GameCore.WeaponArsenalRegistry[structure.equippedWeaponId];
+            if (structure.ammoClipsInMagazines[structure.equippedWeaponId] <= 0) {
+                this.TriggerWeaponReloadSequence();
+                return;
+            }
+
+            const currentTimestamp = performance.now();
+            const minTimeBetweenShotsMs = (60 / activeWeapon.fireRateRpm) * 1000;
+            if (currentTimestamp - absoluteLastShotTime < minTimeBetweenShotsMs) return;
+
+            absoluteLastShotTime = currentTimestamp;
+            structure.ammoClipsInMagazines[structure.equippedWeaponId]--;
+            structure.activeRecoilVisualDisplacement = activeWeapon.recoilForce;
+            cameraEulerRotation.x += activeWeapon.recoilForce * 0.7;
+            
+            GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
+
+            // Šāviena staru translācija 3D telpā
+            const raycaster = new THREE.Raycaster();
+            const centerCrosshairCoords = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(centerCrosshairCoords, GameCore.ThreeGraphicsManager.cameraInstance);
+            
+            // Botu mērķu masīvs
+            const targetMeshes = GameCore.BotSimulationIntelligence.registeredBotRoster
+                .filter(b => b.healthPoints > 0)
+                .map(b => b.meshInstance);
+                
+            const collisionIntersections = raycaster.intersectObjects(targetMeshes);
+            
+            if (collisionIntersections.length > 0) {
+                const hitMesh = collisionIntersections[0].object;
+                const hitBot = GameCore.BotSimulationIntelligence.registeredBotRoster.find(b => b.meshInstance === hitMesh);
+                
+                if (hitBot) {
+                    hitBot.healthPoints -= activeWeapon.damageOutput;
+                    
+                    // Flash asins efekts uz botu
+                    hitMesh.material.color.setHex(0xffffff);
+                    setTimeout(() => { if(hitBot.healthPoints > 0) hitMesh.material.color.setHex(0xdc2626); }, 60);
+
+                    if (hitBot.healthPoints <= 0) {
+                        GameCore.ThreeGraphicsManager.sceneInstance.remove(hitMesh);
+                        GameCore.scoreCounterCT++;
+                        GameCore.PlayerDataStructure.availableCash += 300;
+                        GameCore.UserInterfaceHUD.PushCombatEventNotification(`🎯 Eliminated ${hitBot.uniqueId} (+$300)`);
+                        GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
+                    }
+                }
+            }
         }
     },
 
     UserInterfaceHUD: {
         ForceGlobalSynchronize() {
-            const pData = GameCore.PlayerDataStructure;
-            const wSpecs = GameCore.WeaponArsenalRegistry[pData.equippedWeaponId];
+            const structure = GameCore.PlayerDataStructure;
+            const activeWeapon = GameCore.WeaponArsenalRegistry[structure.equippedWeaponId];
             
-            document.getElementById('hud-val-health').innerText = Math.max(0, pData.currentHp);
-            document.getElementById('hud-val-cash').innerText = `$${pData.availableCash}`;
-            document.getElementById('hud-val-ammo').innerText = `${pData.ammoClipsInMagazines[pData.equippedWeaponId]}/${pData.ammoReserveStorage[pData.equippedWeaponId]}`;
-            document.getElementById('hud-val-weapon').innerText = `GEAR: ${wSpecs.name}`;
+            document.getElementById('hud-val-health').innerText = structure.currentHp;
+            document.getElementById('hud-val-cash').innerText = `$${structure.availableCash}`;
+            document.getElementById('hud-val-ammo').innerText = 
+                `${structure.ammoClipsInMagazines[structure.equippedWeaponId]}/${structure.ammoReserveStorage[structure.equippedWeaponId]}`;
+            document.getElementById('hud-val-weapon').innerText = `GEAR: ${activeWeapon.name.toUpperCase()}`;
             document.getElementById('hud-score-ct').innerText = GameCore.scoreCounterCT;
             document.getElementById('hud-score-t').innerText = GameCore.scoreCounterT;
         },
 
-        PushCombatEventNotification(notificationText) {
-            const containerNode = document.getElementById('killfeed-container');
-            const alertCardNode = document.createElement('div');
-            alertCardNode.className = "feed-item";
-            alertCardNode.innerText = notificationText;
-            containerNode.appendChild(alertCardNode);
-            setTimeout(() => { alertCardNode.remove(); }, 3900);
+        PushCombatEventNotification(messageText) {
+            const container = document.getElementById('killfeed-container');
+            const element = document.createElement('div');
+            element.className = 'feed-item';
+            element.innerText = messageText;
+            container.appendChild(element);
+            setTimeout(() => element.remove(), 4000);
         },
 
-        RenderTacticalRadarBlips() {
-            const ctxRef = GameCore.cachedRadarContext;
-            if(!ctxRef) return;
-            ctxRef.clearRect(0, 0, 180, 180);
+        TriggerDamageIndicatorFlash() {
+            const flashDOM = document.getElementById('damage-flash');
+            flashDOM.style.opacity = '1';
+            setTimeout(() => flashDOM.style.opacity = '0', 120);
+        },
+
+        RenderMiniRadarLayer(playerPos, playerAngleY) {
+            const ctx = GameCore.cachedRadarContext;
+            if(!ctx) return;
             
-            ctxRef.fillStyle = "rgba(15, 23, 42, 0.75)";
-            ctxRef.beginPath(); ctxRef.arc(90, 90, 90, 0, Math.PI * 2); ctxRef.fill();
+            ctx.clearRect(0, 0, 180, 180);
             
-            ctxRef.strokeStyle = "rgba(71, 85, 105, 0.5)";
-            ctxRef.lineWidth = 1;
-            ctxRef.beginPath(); ctxRef.arc(90, 90, 45, 0, Math.PI * 2); ctxRef.stroke();
-            ctxRef.beginPath(); ctxRef.arc(90, 90, 85, 0, Math.PI * 2); ctxRef.stroke();
-
-            const primaryPlayerCameraPos = GameCore.ThreeGraphicsManager.cameraInstance.position;
-            const headingLookVector = new THREE.Vector3();
-            GameCore.ThreeGraphicsManager.cameraInstance.getWorldDirection(headingLookVector);
-            const absoluteAngleY = Math.atan2(headingLookVector.z, headingLookVector.x);
-
-            ctxRef.save();
-            ctxRef.translate(90, 90);
-            ctxRef.rotate(-absoluteAngleY - Math.PI / 2);
-
-            GameCore.BotSimulationIntelligence.registeredBotRoster.forEach(botUnit => {
-                if (botUnit.healthPoints <= 0) return;
-                let relativeDeltaX = (botUnit.meshInstance.position.x - primaryPlayerCameraPos.x) * 0.95;
-                let relativeDeltaZ = (botUnit.meshInstance.position.z - primaryPlayerCameraPos.z) * 0.95;
-                let hypotenuseLength = Math.sqrt(relativeDeltaX * relativeDeltaX + relativeDeltaZ * relativeDeltaZ);
+            ctx.save();
+            ctx.translate(90, 90);
+            ctx.rotate(-playerAngleY - Math.PI);
+            
+            // Zīmējam statiskos šķēršļus uz radara
+            ctx.fillStyle = "rgba(71, 85, 105, 0.6)";
+            GameCore.ProceduralMapArchitect.staticCollisionBoxes.forEach(box => {
+                let cx = (box.min.x + box.max.x) / 2;
+                let cz = (box.min.z + box.max.z) / 2;
+                let w = (box.max.x - box.min.x);
+                let d = (box.max.z - box.min.z);
                 
-                if (hypotenuseLength > 82) {
-                    relativeDeltaX = (relativeDeltaX / hypotenuseLength) * 82;
-                    relativeDeltaZ = (relativeDeltaZ / hypotenuseLength) * 82;
-                }
-                ctxRef.fillStyle = "#ef4444";
-                ctxRef.beginPath(); ctxRef.arc(relativeDeltaX, relativeDeltaZ, 4.5, 0, Math.PI * 2); ctxRef.fill();
+                let rx = cx - playerPos.x;
+                let rz = cz - playerPos.z;
+                
+                ctx.fillRect(rx * 0.5 - (w*0.25), rz * 0.5 - (d*0.25), w * 0.5, d * 0.5);
             });
-            ctxRef.restore();
+
+            // Zīmējam botus uz radara
+            ctx.fillStyle = "#ef4444";
+            GameCore.BotSimulationIntelligence.registeredBotRoster.forEach(bot => {
+                if(bot.healthPoints <= 0) return;
+                let rx = bot.meshInstance.position.x - playerPos.x;
+                let rz = bot.meshInstance.position.z - playerPos.z;
+                ctx.beginPath();
+                ctx.arc(rx * 0.5, rz * 0.5, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            ctx.restore();
+            
+            // Atjaunojam virziena konusu
+            document.getElementById('radar-view-cone').style.transform = `translate(-50%, -100%) rotate(0deg)`;
         }
     },
 
     EngineProcessingCycle: {
-        ProcessFrame(highResolutionTimestamp) {
-            window.requestAnimationFrame((t) => GameCore.EngineProcessingCycle.ProcessFrame(t));
-            let frameDeltaS = cronoClock.getDelta();
-            if (frameDeltaS > 0.08) frameDeltaS = 0.08;
+        ProcessFrame() {
+            // Strādā vienmēr, lai nodrošinātu nepārtrauktu renderēšanu
+            window.requestAnimationFrame(() => GameCore.EngineProcessingCycle.ProcessFrame());
 
-            const playerEntityRef = GameCore.PlayerDataStructure;
-            const activeWeaponSpecs = GameCore.WeaponArsenalRegistry[playerEntityRef.equippedWeaponId];
-
-            if (playerEntityRef.isCurrentlyReloading && performance.now() > playerEntityRef.reloadCompleteTimestamp) {
-                playerEntityRef.isCurrentlyReloading = false;
-                let missingCartridgesCount = activeWeaponSpecs.clipCapacity - playerEntityRef.ammoClipsInMagazines[playerEntityRef.equippedWeaponId];
-                let extractedTransferQuantity = Math.min(missingCartridgesCount, playerEntityRef.ammoReserveStorage[playerEntityRef.equippedWeaponId]);
-                
-                playerEntityRef.ammoClipsInMagazines[playerEntityRef.equippedWeaponId] += extractedTransferQuantity;
-                playerEntityRef.ammoReserveStorage[playerEntityRef.equippedWeaponId] -= extractedTransferQuantity;
-                GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
-            }
-
-            if (primaryMousePressed && activeWeaponSpecs.isFullyAutomatic && GameCore.isEnginePointerLocked) {
-                let msBetweenShotsLimit = 60000 / activeWeaponSpecs.fireRateRpm;
-                if (performance.now() - absoluteLastShotTime > msBetweenShotsLimit) {
-                    this.ExecuteBallisticRaycastDischarge();
-                    absoluteLastShotTime = performance.now();
+            const deltaSeconds = Math.min(cronoClock.getDelta(), 0.1);
+            
+            if (GameCore.isEnginePointerLocked && !GameCore.isEquipmentMenuOpen) {
+                // Automātiskā uguns AK47 un M4A4 ieročiem
+                if (primaryMousePressed && GameCore.WeaponArsenalRegistry[GameCore.PlayerDataStructure.equippedWeaponId].isFullyAutomatic) {
+                    GameCore.ExecutionCombatLogic.ExecuteWeaponDischargeRaycast();
                 }
-            }
 
-            if (GameCore.isEnginePointerLocked) {
-                movementDirection.z = Number(inputKeys.w) - Number(inputKeys.s);
-                movementDirection.x = Number(inputKeys.a) - Number(inputKeys.d);
+                // Rotācijas matricas pielietošana kamerai
+                GameCore.ThreeGraphicsManager.cameraInstance.quaternion.setFromEuler(cameraEulerRotation);
+
+                // Spēlētāja kustība un ātrums
+                let movementModifier = 1.0;
+                if (inputKeys.shift) movementModifier = 0.42;
+                
+                movementDirection.z = Number(inputKeys.s) - Number(inputKeys.w);
+                movementDirection.x = Number(inputKeys.d) - Number(inputKeys.a);
                 movementDirection.normalize();
 
-                let contextualVelocityLimit = inputKeys.shift ? playerEntityRef.movementBaseVelocity * 0.42 : playerEntityRef.movementBaseVelocity;
-                if (playerEntityRef.isOpticsScoped) contextualVelocityLimit *= 0.30;
-
-                movementVelocity.x -= movementVelocity.x * 9.5 * frameDeltaS;
-                movementVelocity.z -= movementVelocity.z * 9.5 * frameDeltaS;
-
-                if (inputKeys.w || inputKeys.s) movementVelocity.z -= movementDirection.z * contextualVelocityLimit * frameDeltaS;
-                if (inputKeys.a || inputKeys.d) movementVelocity.x -= movementDirection.x * contextualVelocityLimit * frameDeltaS;
-
-                let originalCoordinatesBackup = GameCore.ThreeGraphicsManager.cameraInstance.position.clone();
-                GameCore.ThreeGraphicsManager.cameraInstance.moveRight(-movementVelocity.x * frameDeltaS);
-                GameCore.ThreeGraphicsManager.cameraInstance.moveForward(-movementVelocity.z * frameDeltaS);
-
-                playerEntityRef.computedVerticalVelocity -= 9.8 * 4.2 * frameDeltaS;
-                GameCore.ThreeGraphicsManager.cameraInstance.position.y += playerEntityRef.computedVerticalVelocity * frameDeltaS;
-
-                if (GameCore.ThreeGraphicsManager.cameraInstance.position.y < playerEntityRef.cameraEyeHeightLevel) {
-                    playerEntityRef.computedVerticalVelocity = 0.0;
-                    GameCore.ThreeGraphicsManager.cameraInstance.position.y = playerEntityRef.cameraEyeHeightLevel;
-                    playerEntityRef.playerCanPerformJump = true;
+                const currentCameraRotationY = cameraEulerRotation.y;
+                
+                if (movementDirection.z !== 0 || movementDirection.x !== 0) {
+                    let forwardVector = new THREE.Vector3(0, 0, movementDirection.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentCameraRotationY);
+                    let strafeVector = new THREE.Vector3(movementDirection.x, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentCameraRotationY);
+                    
+                    let combinedRunVector = new THREE.Vector3().addVectors(forwardVector, strafeVector).normalize();
+                    movementVelocity.copy(combinedRunVector).multiplyScalar(GameCore.PlayerDataStructure.movementBaseVelocity * movementModifier);
+                } else {
+                    movementVelocity.set(0, 0, 0);
                 }
 
-                if (inputKeys[' '] && playerEntityRef.playerCanPerformJump) {
-                    playerEntityRef.computedVerticalVelocity = 14.5;
-                    playerEntityRef.playerCanPerformJump = false;
+                // Fizika un gravitācija lēcieniem
+                if (!GameCore.PlayerDataStructure.playerCanPerformJump) {
+                    GameCore.PlayerDataStructure.computedVerticalVelocity -= 32.0 * deltaSeconds;
+                } else if (inputKeys[' ']) {
+                    GameCore.PlayerDataStructure.computedVerticalVelocity = 13.5;
+                    GameCore.PlayerDataStructure.playerCanPerformJump = false;
                 }
 
-                let playerSimulatedBoundingBox = new THREE.Box3().setFromCenterAndSize(
-                    GameCore.ThreeGraphicsManager.cameraInstance.position,
-                    new THREE.Vector3(playerEntityRef.collisionBoundingRadius, 2.2, playerEntityRef.collisionBoundingRadius)
-                );
+                let potentialStepPosition = GameCore.ThreeGraphicsManager.cameraInstance.position.clone();
+                potentialStepPosition.addScaledVector(movementVelocity, deltaSeconds);
+                potentialStepPosition.y += GameCore.PlayerDataStructure.computedVerticalVelocity * deltaSeconds;
 
-                for (let boxIdx = 0; boxIdx < GameCore.ProceduralMapArchitect.staticCollisionBoxes.length; boxIdx++) {
-                    if (playerSimulatedBoundingBox.intersectsBox(GameCore.ProceduralMapArchitect.staticCollisionBoxes[boxIdx])) {
-                        GameCore.ThreeGraphicsManager.cameraInstance.position.x = originalCoordinatesBackup.x;
-                        GameCore.ThreeGraphicsManager.cameraInstance.position.z = originalCoordinatesBackup.z;
+                if (potentialStepPosition.y <= GameCore.PlayerDataStructure.cameraEyeHeightLevel) {
+                    potentialStepPosition.y = GameCore.PlayerDataStructure.cameraEyeHeightLevel;
+                    GameCore.PlayerDataStructure.computedVerticalVelocity = 0.0;
+                    GameCore.PlayerDataStructure.playerCanPerformJump = true;
+                }
+
+                // Sienu kolīzijas noteikšana
+                let playerBoundingSphere = new THREE.Sphere(potentialStepPosition, GameCore.PlayerDataStructure.collisionBoundingRadius);
+                let collisionDetected = false;
+                
+                for (let box of GameCore.ProceduralMapArchitect.staticCollisionBoxes) {
+                    if (box.intersectsSphere(playerBoundingSphere)) {
+                        collisionDetected = true;
                         break;
                     }
                 }
 
-                if (playerEntityRef.activeRecoilVisualDisplacement > 0.0) {
-                    GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.position.z = playerEntityRef.activeRecoilVisualDisplacement * 2.2;
-                    GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.position.y = playerEntityRef.activeRecoilVisualDisplacement * 0.4;
-                    playerEntityRef.activeRecoilVisualDisplacement -= frameDeltaS * 0.45;
+                if (!collisionDetected) {
+                    GameCore.ThreeGraphicsManager.cameraInstance.position.copy(potentialStepPosition);
                 } else {
-                    GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.position.set(0, 0, 0);
+                    // Ja notiek sadursme, ļaujam tikai vertikālo kustību (krītot)
+                    GameCore.ThreeGraphicsManager.cameraInstance.position.y = potentialStepPosition.y;
                 }
+
+                // Ieroča vizuālais atsitiens (Recoil smooth damping)
+                const weaponWrapper = GameCore.ThreeGraphicsManager.nestedGunMeshWrapper;
+                GameCore.PlayerDataStructure.activeRecoilVisualDisplacement = THREE.MathUtils.lerp(GameCore.PlayerDataStructure.activeRecoilVisualDisplacement, 0, 10 * deltaSeconds);
+                weaponWrapper.position.z = GameCore.PlayerDataStructure.activeRecoilVisualDisplacement * 1.5;
+
+                // Atjaunojam Botu AI un dūmu animācijas
+                GameCore.BotSimulationIntelligence.CoordinateBehavioralDecisions(deltaSeconds, GameCore.ThreeGraphicsManager.cameraInstance.position);
+                GameCore.ProceduralMapArchitect.AnimateAndFilterSmokes();
+                
+                // Radara renderēšana
+                GameCore.UserInterfaceHUD.RenderMiniRadarLayer(GameCore.ThreeGraphicsManager.cameraInstance.position, currentCameraRotationY);
             }
 
-            GameCore.ProceduralMapArchitect.AnimateAndFilterSmokes();
-            GameCore.BotSimulationIntelligence.CoordinateBehavioralDecisions(frameDeltaS, GameCore.ThreeGraphicsManager.cameraInstance.position);
-            GameCore.UserInterfaceHUD.RenderTacticalRadarBlips();
-            
-            GameCore.ThreeGraphicsManager.webGlRenderer.render(GameCore.ThreeGraphicsManager.sceneInstance, GameCore.ThreeGraphicsManager.cameraInstance);
-        },
-
-        InitiateWeaponReloadSequence() {
-            const pObj = GameCore.PlayerDataStructure;
-            const wObj = GameCore.WeaponArsenalRegistry[pObj.equippedWeaponId];
-            if (pObj.isCurrentlyReloading || pObj.ammoClipsInMagazines[pObj.equippedWeaponId] === wObj.clipCapacity || pObj.ammoReserveStorage[pObj.equippedWeaponId] <= 0) return;
-            
-            pObj.isCurrentlyReloading = true;
-            pObj.reloadCompleteTimestamp = performance.now() + 1900;
-            GameCore.UserInterfaceHUD.PushCombatEventNotification("🔀 Reloading system mechanisms...");
-        },
-
-        DeploySmokeScreenUtility() {
-            const traceDirectionVector = new THREE.Vector3();
-            GameCore.ThreeGraphicsManager.cameraInstance.getWorldDirection(traceDirectionVector);
-            GameCore.ProceduralMapArchitect.DeployTacticalSmokeVolumetric(GameCore.ThreeGraphicsManager.cameraInstance.position, traceDirectionVector);
-            GameCore.UserInterfaceHUD.PushCombatEventNotification("💨 Smoke tactical screen deployed.");
-        },
-
-        ToggleMechanicalOpticsScope() {
-            const pEntityRef = GameCore.PlayerDataStructure;
-            if (pEntityRef.equippedWeaponId !== 'awp') return;
-            pEntityRef.isOpticsScoped = !pEntityRef.isOpticsScoped;
-            
-            const scopeOverlayElement = document.getElementById('sniper-scope-view');
-            const crosshairOverlayElement = document.getElementById('tactical-crosshair');
-            
-            if (pEntityRef.isOpticsScoped) {
-                GameCore.ThreeGraphicsManager.cameraInstance.fov = 18;
-                scopeOverlayElement.style.display = 'block';
-                crosshairOverlayElement.style.display = 'none';
-                GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.visible = false;
-            } else {
-                GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
-                scopeOverlayElement.style.display = 'none';
-                crosshairOverlayElement.style.display = 'block';
-                GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.visible = true;
-            }
-            GameCore.ThreeGraphicsManager.cameraInstance.updateProjectionMatrix();
-        },
-
-        ExecuteBallisticRaycastDischarge() {
-            const pProfile = GameCore.PlayerDataStructure;
-            const wSpecs = GameCore.WeaponArsenalRegistry[pProfile.equippedWeaponId];
-            if (pProfile.isCurrentlyReloading || pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] <= 0) return;
-
-            pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId]--;
-            pProfile.activeRecoilVisualDisplacement = wSpecs.recoilForce;
-            GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
-
-            const standardRaycaster = new THREE.Raycaster();
-            const normalizedScreenCenterCoordinates = new THREE.Vector2(0, 0);
-            standardRaycaster.setFromCamera(normalizedScreenCenterCoordinates, GameCore.ThreeGraphicsManager.cameraInstance);
-
-            let combatantMeshTargetsArray = [];
-            GameCore.BotSimulationIntelligence.registeredBotRoster.forEach(enemyBot => {
-                if(enemyBot.healthPoints > 0) combatantMeshTargetsArray.push(enemyBot.meshInstance);
-            });
-
-            const raycastIntersectionsResultsList = standardRaycaster.intersectObjects(combatantMeshTargetsArray);
-
-            if (raycastIntersectionsResultsList.length > 0) {
-                const targetIntersectedObjectRef = raycastIntersectionsResultsList[0].object;
-                let customBotInstanceMatch = GameCore.BotSimulationIntelligence.registeredBotRoster.find(bElement => bElement.meshInstance === targetIntersectedObjectRef);
-
-                if (customBotInstanceMatch) {
-                    customBotInstanceMatch.healthPoints -= wSpecs.damageOutput;
-                    GameCore.UserInterfaceHUD.PushCombatEventNotification(`🎯 Impact hit registered on target: -${wSpecs.damageOutput} HP`);
-                    
-                    if (customBotInstanceMatch.healthPoints <= 0) {
-                        GameCore.ThreeGraphicsManager.sceneInstance.remove(customBotInstanceMatch.meshInstance);
-                        GameCore.scoreCounterCT++;
-                        pProfile.availableCash += 300;
-                        GameCore.UserInterfaceHUD.PushCombatEventNotification("💀 Threat eliminated. Combat bounty rewarded: +$300");
-                        GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
-                    }
-                }
-            }
-
-            if (pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] === 0) this.InitiateWeaponReloadSequence();
-        },
-
-        InflictDamageOnPlayerEntity(incomingDamagePoints) {
-            const playerProfile = GameCore.PlayerDataStructure;
-            if(playerProfile.currentHp <= 0) return;
-
-            playerProfile.currentHp -= incomingDamagePoints;
-            GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
-
-            const flashViewNode = document.getElementById('damage-flash');
-            flashViewNode.style.opacity = '1';
-            setTimeout(() => { flashViewNode.style.opacity = '0'; }, 120);
-
-            if (playerProfile.currentHp <= 0) {
-                GameCore.UserInterfaceHUD.PushCombatEventNotification("💀 Critical Failure: Terminated in action. Respawning...");
-                GameCore.scoreCounterT++;
-                playerProfile.currentHp = 100;
-                GameCore.ThreeGraphicsManager.cameraInstance.position.set(0, playerProfile.cameraEyeHeightLevel, 60);
-                GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
+            // Renderējam 3D kadru uz ekrāna
+            if (GameCore.ThreeGraphicsManager.webGlRenderer && GameCore.ThreeGraphicsManager.sceneInstance && GameCore.ThreeGraphicsManager.cameraInstance) {
+                GameCore.ThreeGraphicsManager.webGlRenderer.render(GameCore.ThreeGraphicsManager.sceneInstance, GameCore.ThreeGraphicsManager.cameraInstance);
             }
         }
     }
 };
 
+// DZINĒJA PALAIŠANA: Startējam dzinēja sagatavošanu un kadru zīmēšanu uzreiz
 window.onload = () => {
     GameCore.InitializeEngine();
 };
