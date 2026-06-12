@@ -3,104 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS2 Web 3D Offline Prototips v4 (Jump Update)</title>
+    <title>CS2 Web 3D Remastered Offline</title>
     <style>
         body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            width: 100%;
-            height: 100%;
-            background-color: #0c0f12;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            user-select: none;
+            margin: 0; padding: 0; overflow: hidden;
+            width: 100%; height: 100%; background-color: #080a0c;
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif; user-select: none;
         }
         #hud {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            background: rgba(15, 23, 42, 0.9);
-            padding: 12px 40px;
-            border-radius: 8px;
-            font-size: 22px;
-            font-weight: bold;
-            pointer-events: none;
-            border-bottom: 4px solid #de9b35;
-            display: flex;
-            gap: 40px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            z-index: 5;
-            transition: opacity 0.3s;
-            opacity: 0;
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            color: white; background: rgba(10, 15, 26, 0.93);
+            padding: 14px 45px; border-radius: 6px; font-size: 24px; font-weight: 800;
+            pointer-events: none; border-bottom: 4px solid #de9b35;
+            display: flex; gap: 50px; box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            z-index: 5; opacity: 0; transition: opacity 0.3s;
         }
         #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 30px;
-            height: 30px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 5;
-            display: none;
+            position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+            transform: translate(-50%, -50%); pointer-events: none; z-index: 5; display: none;
         }
         .ch-line {
-            position: absolute;
-            background: #00ff00;
-            box-shadow: 0 0 4px #00ff00;
-            transition: transform 0.05s ease;
+            position: absolute; background: #00ff00; box-shadow: 0 0 5px rgba(0,255,0,0.8);
+            transition: transform 0.04s linear;
         }
-        #ch-top    { top: 0; left: 14px; width: 2px; height: 8px; }
-        #ch-bottom { bottom: 0; left: 14px; width: 2px; height: 8px; }
-        #ch-left   { top: 14px; left: 0; width: 8px; height: 2px; }
-        #ch-right  { top: 14px; right: 0; width: 8px; height: 2px; }
+        #ch-top    { top: 0; left: 19px; width: 2px; height: 10px; }
+        #ch-bottom { bottom: 0; left: 19px; width: 2px; height: 10px; }
+        #ch-left   { top: 19px; left: 0; width: 10px; height: 2px; }
+        #ch-right  { top: 19px; right: 0; width: 10px; height: 2px; }
+        #ch-dot    { top: 19px; left: 19px; width: 2px; height: 2px; background: #00ff00; }
 
         #menu-container {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
-            color: white;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 10;
+            position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1b222c 0%, #090d12 100%);
+            color: white; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center; z-index: 10;
         }
         .menu-card {
-            background: rgba(15, 23, 42, 0.8);
-            padding: 40px 60px;
-            border-radius: 12px;
-            border: 2px solid #334155;
-            border-bottom: 6px solid #de9b35;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            background: rgba(15, 22, 36, 0.85); padding: 50px 70px;
+            border-radius: 8px; border: 1px solid #2d3748;
+            border-bottom: 5px solid #de9b35; box-shadow: 0 25px 60px rgba(0,0,0,0.85);
         }
         .btn {
-            background-color: #de9b35;
-            color: white;
-            border: none;
-            padding: 14px 40px;
-            font-size: 20px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-top: 25px;
+            background-color: #de9b35; color: white; border: none;
+            padding: 16px 50px; font-size: 22px; font-weight: 900;
+            border-radius: 4px; cursor: pointer; margin-top: 30px;
             transition: background 0.2s, transform 0.1s;
-            box-shadow: 0 4px 12px rgba(222, 155, 53, 0.3);
+            letter-spacing: 1px; box-shadow: 0 5px 15px rgba(222, 155, 53, 0.3);
         }
         .btn:hover { background-color: #c98a2d; transform: translateY(-2px); }
         .btn:active { transform: translateY(0); }
         
         .controls-info {
-            margin-top: 25px;
-            color: #9ca3af;
-            font-size: 14px;
-            line-height: 1.6;
+            margin-top: 30px; color: #a0aec0; font-size: 14px; line-height: 1.7;
+            border-top: 1px solid #2d3748; padding-top: 20px;
         }
-        .controls-info strong { color: #e2e8f0; }
+        .controls-info strong { color: #edf2f7; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -108,20 +65,21 @@
 
     <div id="menu-container">
         <div class="menu-card">
-            <h1 id="menu-title" style="color: #de9b35; font-size: 46px; margin: 0 0 10px 0; letter-spacing: 2px;">COUNTER-STRIKE 2</h1>
-            <p id="menu-sub" style="color: #9ca3af; font-size: 18px; margin: 0 0 20px 0;">3D Web Offline Simulator</p>
+            <h1 id="menu-title" style="color: #de9b35; font-size: 52px; margin: 0 0 5px 0; letter-spacing: 3px; font-weight: 900;">COUNTER-STRIKE 2</h1>
+            <p id="menu-sub" style="color: #718096; font-size: 18px; margin: 0 0 25px 0; letter-spacing: 1px;">WEB 3D ENGINE MAX-EDITION</p>
             <button class="btn" onclick="startMatch()">START MATCH</button>
             
             <div class="controls-info">
-                <strong>W, A, S, D</strong> — Kustība<br>
-                <strong>SPACE (Atstarpe)</strong> — Lēkt (Jump Update)<br>
-                <strong>Pele</strong> — Skatīties apkārt & Tēmēt<br>
-                <strong>Kreisais klikšķis</strong> — Šaut | <strong>R</strong> — Pārlādēt
+                <strong>W, A, S, D</strong> — Kustība (ar CS2 inerci)<br>
+                <strong>SHIFT (Turēt)</strong> — Pieliekties (Crouch / Lēnāka gaita)<br>
+                <strong>SPACE</strong> — Lēkt (Jump) | <strong>R</strong> — Pārlādēt aptveri<br>
+                <strong>Pele / Klikšķis</strong> — Tēmēt un šaut mērķī
             </div>
         </div>
     </div>
 
     <div id="crosshair">
+        <div id="ch-dot"></div>
         <div class="ch-line" id="ch-top"></div>
         <div class="ch-line" id="ch-bottom"></div>
         <div class="ch-line" id="ch-left"></div>
@@ -129,9 +87,9 @@
     </div>
 
     <div id="hud">
-        <div style="color: #3b82f6;">KILLS: <span id="score">0</span></div>
-        <div style="color: #ef4444;">HP: <span id="hp">100</span>%</div>
-        <div style="color: #f59e0b;">AMMO: <span id="ammo">30/90</span></div>
+        <div style="color: #4299e1;">KILLS: <span id="score">0</span></div>
+        <div style="color: #f56565;">HP: <span id="hp">100</span>%</div>
+        <div style="color: #ecc94b;">AMMO: <span id="ammo">30/90</span></div>
     </div>
 
 <script>
@@ -144,10 +102,7 @@
     let isLocked = false;
 
     function startMatch() {
-        if (player.hp <= 0) {
-            window.location.reload();
-            return;
-        }
+        if (player.hp <= 0) { window.location.reload(); return; }
         document.body.requestPointerLock();
     }
 
@@ -159,165 +114,165 @@
             isLocked = true;
         } else {
             if (player.hp > 0) {
-                menuTitle.innerText = "SPĒLE PAUZĒTA";
-                menuSub.innerText = "Noklikšķini uz pogas, lai turpinātu maču";
+                menuTitle.innerText = "PAUSE";
+                menuSub.innerText = "Klikšķini, lai turpinātu cīņu";
                 menuContainer.style.display = 'flex';
-                hud.style.opacity = '0.5';
+                hud.style.opacity = '0.4';
             }
             isLocked = false;
         }
     });
 
-    // --- 3D Vide ---
+    // --- 3D Inicializācija ---
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x232d3a);
-    scene.fog = new THREE.FogExp2(0x232d3a, 0.022);
+    scene.background = new THREE.Color(0x1a2333);
+    scene.fog = new THREE.FogExp2(0x1a2333, 0.02);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1000);
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Apgaismojums
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const sunLight = new THREE.DirectionalLight(0xfff7ed, 0.85);
-    sunLight.position.set(25, 45, 15);
-    scene.add(sunLight);
+    // Apgaismojums (Maigs dzeltenīgs Dust2 saulrieta stils)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    const sun = new THREE.DirectionalLight(0xfff1e0, 0.9);
+    sun.position.set(40, 60, 20);
+    scene.add(sun);
 
-    // Grīda
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ color: 0x5c5245, roughness: 0.9 }));
+    // Smilšainā Dust2 grīda
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(150, 150), new THREE.MeshStandardMaterial({ color: 0x5c5041, roughness: 0.95 }));
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    // --- Karte ---
+    // --- Mapes Izbūve (Dust 2 Arēnas Imitācija) ---
     const walls = [];
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x807361, roughness: 0.8 });
-    const boxMat = new THREE.MeshStandardMaterial({ color: 0x925414, roughness: 0.85 });
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x82725d, roughness: 0.85 }); // Betona dzeltenās sienas
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x9c5a1a, roughness: 0.9 });  // Koka kastes
 
-    function addStructure(x, z, w, h, d, material = wallMat) {
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+    function buildObj(x, z, w, h, d, mat = wallMat) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
         mesh.position.set(x, h / 2, z);
         scene.add(mesh);
         walls.push(mesh);
     }
 
-    // Ārējais perimetrs
-    addStructure(0, -60, 120, 8, 2); addStructure(0, 60, 120, 8, 2);
-    addStructure(-60, 0, 2, 8, 120); addStructure(60, 0, 2, 8, 120);
+    // Kartes robežas
+    buildObj(0, -70, 140, 10, 2); buildObj(0, 70, 140, 10, 2);
+    buildObj(-70, 0, 2, 10, 140); buildObj(70, 0, 2, 10, 140);
 
-    // Struktūras (Dust II stila izkārtojums)
-    addStructure(-25, -25, 20, 6, 4);
-    addStructure(25, -20, 4, 6, 25);
-    addStructure(0, -10, 30, 6, 4);
-    addStructure(-15, 25, 4, 6, 20);
-    addStructure(15, 35, 20, 6, 4);
+    // Taktiskās sienas un ejas (A un B plantu izkārtojums)
+    buildObj(-30, -30, 25, 7, 5);
+    buildObj(30, -25, 5, 7, 30);
+    buildObj(0, -15, 35, 7, 4);
+    buildObj(-20, 30, 5, 7, 25);
+    buildObj(20, 40, 30, 7, 5);
     
-    // Kastes un to sakraušana (Stacking)
-    addStructure(6, 6, 3, 3, 3, boxMat);
-    addStructure(9, 6, 2.4, 2.4, 2.4, boxMat);
-    addStructure(6, 6, 2.2, 2.2, 2.2, boxMat); // Kaste uz kastes
-    walls[walls.length-1].position.y = 3 + 1.1; 
+    // Kastes (un kastes uz kastēm taktiskam "headshot leņķim")
+    buildObj(8, 8, 3.5, 3.5, 3.5, boxMat);
+    buildObj(11.5, 8, 3, 3, 3, boxMat);
+    buildObj(8, 8, 2.8, 2.8, 2.8, boxMat); // Stack
+    walls[walls.length-1].position.y = 3.5 + 1.4;
 
-    addStructure(-30, 5, 4, 4, 4, boxMat);
-    addStructure(-26, 5, 3, 3, 3, boxMat);
-    addStructure(35, 25, 3.5, 3.5, 3.5, boxMat);
+    buildObj(-35, 8, 4.5, 4.5, 4.5, boxMat);
+    buildObj(-31, 8, 3.5, 3.5, 3.5, boxMat);
+    buildObj(40, 20, 4, 4, 4, boxMat);
 
-    // --- Spēlētāja iestatījumi ---
+    // --- Spēlētājs un CS2 ieroča modelis (M4A4 stils) ---
     const player = {
         hp: 100, score: 0, ammo: 30, maxAmmo: 30, reserveAmmo: 90,
-        speed: 13.5, isReloading: false,
-        height: 2.0,       // Acu augstums stāvot
-        yVelocity: 0,      // Vertikālais ātrums (lēkšanai)
-        canJump: true      // Vai drīkst lēkt
+        speed: 14.0, isReloading: false, isCrouching: false,
+        height: 2.1, yVel: 0, canJump: true
     };
-    camera.position.set(0, player.height, 50);
+    camera.position.set(0, player.height, 55);
 
-    // 3D Ierocis
+    // Detalizētāka ieroča grupa
     const gunGroup = new THREE.Group();
-    const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 0.35), new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
-    const barrelMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.25), new THREE.MeshStandardMaterial({ color: 0x111827 }));
-    barrelMesh.rotation.x = Math.PI / 2;
-    barrelMesh.position.z = -0.25;
-    gunGroup.add(bodyMesh, barrelMesh);
+    const mainBody = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.07, 0.3), new THREE.MeshStandardMaterial({ color: 0x1a202c }));
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.28), new THREE.MeshStandardMaterial({ color: 0x0d1117 }));
+    barrel.rotation.x = Math.PI / 2; barrel.position.z = -0.22;
+    const mag = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.09, 0.07), new THREE.MeshStandardMaterial({ color: 0x2d3748 }));
+    mag.position.set(0, -0.06, -0.05); mag.rotation.x = 0.15;
+    const handguard = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.15), new THREE.MeshStandardMaterial({ color: 0x2d3748 }));
+    handguard.position.z = -0.12;
+
+    gunGroup.add(mainBody, barrel, mag, handguard);
     scene.add(gunGroup);
 
-    const flashLight = new THREE.PointLight(0xfde047, 0, 4);
+    // Muzzle Flash gaisma
+    const flashLight = new THREE.PointLight(0xffdf6d, 0, 5);
     flashLight.position.set(0, 0, -0.4);
     gunGroup.add(flashLight);
 
-    // Kustību vadība
-    const keys = { w: false, a: false, s: false, d: false, ' ': false };
+    // Vadība un inerce
+    const keys = { w: false, a: false, s: false, d: false, ' ': false, shift: false };
     let velocity = new THREE.Vector3(), yaw = 0, pitch = 0;
-    let mouseX = 0, mouseY = 0;
+    let lookX = 0, lookY = 0; // Peles kustības reģistrēšana priekš Weapon Sway
 
     document.addEventListener('keydown', (e) => { 
         const k = e.key === ' ' ? ' ' : e.key.toLowerCase();
-        if(keys.hasOwnProperty(k)) keys[k] = true; 
+        if(keys.hasOwnProperty(k)) keys[k] = true;
         if(k === 'r') reload();
     });
     document.addEventListener('keyup', (e) => { 
         const k = e.key === ' ' ? ' ' : e.key.toLowerCase();
-        if(keys.hasOwnProperty(k)) keys[k] = false; 
+        if(keys.hasOwnProperty(k)) keys[k] = false;
     });
     
     document.addEventListener('mousemove', (e) => {
         if (!isLocked) return;
-        mouseX = e.movementX;
-        mouseY = e.movementY;
-        yaw -= e.movementX * 0.0022;
-        pitch -= e.movementY * 0.0022;
+        lookX = e.movementX; lookY = e.movementY;
+        yaw -= e.movementX * 0.0021; pitch -= e.movementY * 0.0021;
         pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, pitch));
         camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
     });
 
-    // --- Boti & Efekti ---
+    // --- Boti, Efekti un Šaušana ---
     const bots = [];
     const particles = [];
     const raycaster = new THREE.Raycaster();
 
     function spawnBot(x, z) {
         const bot = new THREE.Group();
-        const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.8, 1.6), new THREE.MeshStandardMaterial({ color: 0x9a3412 }));
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
-        head.position.y = 1.7;
-        bot.add(body, head);
-        bot.position.set(x, 1.4, z);
-        bot.lastShot = 0;
-        scene.add(bot);
-        bots.push(bot);
+        const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.9, 1.6), new THREE.MeshStandardMaterial({ color: 0x9c4222 })); // Teroristu apģērbs
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.65), new THREE.MeshStandardMaterial({ color: 0xdd6b20 }));
+        head.position.y = 1.75;
+        bot.add(body, head); bot.position.set(x, 1.45, z);
+        bot.lastShot = 0; bot.strafeDir = Math.random() > 0.5 ? 1 : -1; bot.nextStrafe = 0;
+        scene.add(bot); bots.push(bot);
     }
 
-    spawnBot(-40, -40); spawnBot(40, -40); spawnBot(-40, 20); spawnBot(40, 35);
+    // Izvietojam 4 botus stūros
+    spawnBot(-45, -45); spawnBot(45, -45); spawnBot(-45, 25); spawnBot(45, 45);
 
-    // Šaušana
+    // Šaušanas izpilde
     document.addEventListener('mousedown', (e) => {
         if (!isLocked || e.button !== 0 || player.hp <= 0 || player.ammo <= 0 || player.isReloading) return;
 
-        player.ammo--;
-        updateHUD();
+        player.ammo--; updateHUD();
 
-        gunGroup.position.z += 0.08;
-        gunGroup.position.y += 0.02;
+        // CS2 Recoil (Atsitiens uz augšu un atpakaļ)
+        gunGroup.position.z += 0.09;
+        gunGroup.position.y += 0.025;
 
-        flashLight.intensity = 3.5;
-        setTimeout(() => flashLight.intensity = 0, 45);
+        flashLight.intensity = 4;
+        setTimeout(() => flashLight.intensity = 0, 40);
 
         raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-        
-        const intersectsBot = raycaster.intersectObjects(bots, true);
-        const intersectsWall = raycaster.intersectObjects(walls);
+        const hitBot = raycaster.intersectObjects(bots, true);
+        const hitWall = raycaster.intersectObjects(walls);
 
-        let bDist = intersectsBot.length > 0 ? intersectsBot[0].distance : Infinity;
-        let wDist = intersectsWall.length > 0 ? intersectsWall[0].distance : Infinity;
+        let bD = hitBot.length > 0 ? hitBot[0].distance : Infinity;
+        let wD = hitWall.length > 0 ? hitWall[0].distance : Infinity;
 
-        if (intersectsBot.length > 0 && bDist < wDist) {
-            let hitBot = intersectsBot[0].object;
-            while (hitBot.parent && hitBot.parent !== scene) hitBot = hitBot.parent;
+        if (hitBot.length > 0 && bD < wD) {
+            let rootBot = hitBot[0].object;
+            while (rootBot.parent && rootBot.parent !== scene) rootBot = rootBot.parent;
             
-            createBlood(intersectsBot[0].point);
-            hitBot.position.set((Math.random() - 0.5) * 80, 1.4, (Math.random() - 0.5) * 80);
-            player.score++;
-            updateHUD();
+            createEffects(hitBot[0].point); // Asinis un dūmi
+
+            // Respawn
+            rootBot.position.set((Math.random() - 0.5) * 90, 1.45, (Math.random() - 0.5) * 90);
+            player.score++; updateHUD();
         }
     });
 
@@ -328,11 +283,9 @@
         setTimeout(() => {
             const needed = player.maxAmmo - player.ammo;
             const transfer = Math.min(needed, player.reserveAmmo);
-            player.ammo += transfer;
-            player.reserveAmmo -= transfer;
-            player.isReloading = false;
-            updateHUD();
-        }, 1400);
+            player.ammo += transfer; player.reserveAmmo -= transfer;
+            player.isReloading = false; updateHUD();
+        }, 1300);
     }
 
     function updateHUD() {
@@ -341,20 +294,18 @@
         if(!player.isReloading) document.getElementById('ammo').innerText = `${player.ammo}/${player.reserveAmmo}`;
     }
 
-    function createBlood(pos) {
-        for (let i = 0; i < 12; i++) {
-            const pMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshBasicMaterial({ color: 0xb91c1c }));
-            pMesh.position.copy(pos);
-            scene.add(pMesh);
+    function createEffects(pos) {
+        // Radīt asins šļakatas (daļiņas)
+        for (let i = 0; i < 14; i++) {
+            const p = new THREE.Mesh(new THREE.SphereGeometry(0.06, 4, 4), new THREE.MeshBasicMaterial({ color: 0x9b1c1c }));
+            p.position.copy(pos); scene.add(p);
             particles.push({
-                mesh: pMesh,
-                v: new THREE.Vector3((Math.random()-0.5)*4, Math.random()*3+1, (Math.random()-0.5)*4),
-                life: 0.9
+                mesh: p, v: new THREE.Vector3((Math.random()-0.5)*4.5, Math.random()*3+1, (Math.random()-0.5)*4.5), life: 0.85
             });
         }
     }
 
-    // --- Galvenais Cikls ---
+    // --- Galvenais Spēles Cikls ---
     const clock = new THREE.Clock();
     let bobTime = 0;
 
@@ -364,136 +315,137 @@
         const time = performance.now();
 
         if (player.hp <= 0) {
-            isLocked = false;
-            crosshair.style.display = 'none';
-            menuTitle.innerText = "DEFEAT / K.I.A.";
-            menuTitle.style.color = "#ef4444";
-            menuSub.innerHTML = `Tu zaudēji cīņu.<br>Tavs rezultāts: <strong>${player.score}</strong> nošauti boti.`;
-            document.getElementById('instructions').innerText = "Noklikšķini uz pogas, lai sāktu jaunu spēli";
-            menuContainer.style.display = 'flex';
-            hud.style.opacity = '0';
+            isLocked = false; crosshair.style.display = 'none';
+            menuTitle.innerText = "MATCH LOST"; menuTitle.style.color = "#f56565";
+            menuSub.innerHTML = `Tu zaudēji maču.<br>Tavs rezultāts: <strong>${player.score}</strong>kills.`;
+            menuContainer.style.display = 'flex'; hud.style.opacity = '0';
             return;
         }
 
         if (isLocked) {
-            // 1. Kustība pa X/Z asi
-            velocity.x -= velocity.x * 10.0 * delta;
-            velocity.z -= velocity.z * 10.0 * delta;
+            // 1. Kustība pa X/Z asīm ar CS2 tipa inerci (Sliding frikcija)
+            velocity.x -= velocity.x * 8.5 * delta;
+            velocity.z -= velocity.z * 8.5 * delta;
+
+            player.isCrouching = keys.shift;
+            let targetHeight = player.isCrouching ? 1.3 : 2.1;
+            let currentMoveSpeed = player.isCrouching ? 5.5 : player.speed;
+
+            // Kameras augstuma pielāgošana (gluda pieliekšanās animācija)
+            player.height = THREE.MathUtils.lerp(player.height, targetHeight, 14 * delta);
 
             let moveZ = Number(keys.w) - Number(keys.s);
             let moveX = Number(keys.d) - Number(keys.a);
 
             const camDir = new THREE.Vector3();
-            camera.getWorldDirection(camDir);
-            camDir.y = 0; camDir.normalize();
+            camera.getWorldDirection(camDir); camDir.y = 0; camDir.normalize();
             const camRight = new THREE.Vector3().crossVectors(camDir, camera.up).normalize();
 
-            if (keys.w || keys.s) velocity.addScaledVector(camDir, moveZ * player.speed * 10 * delta);
-            if (keys.a || keys.d) velocity.addScaledVector(camRight, moveX * player.speed * 10 * delta);
+            if (keys.w || keys.s) velocity.addScaledVector(camDir, moveZ * currentMoveSpeed * 9 * delta);
+            if (keys.a || keys.d) velocity.addScaledVector(camRight, moveX * currentMoveSpeed * 9 * delta);
 
             const oldPos = camera.position.clone();
             camera.position.addScaledVector(velocity, delta);
 
-            // --- JUMP & GRAVITĀCIJAS APSTRĀDE (Y ass) ---
-            if (keys[' '] && player.canJump) {
-                player.yVelocity = 12.0; // Lēciena spēks (uz augšu)
-                player.canJump = false;
+            // --- LĒKŠANA UN GRAVITĀCIJA ---
+            if (keys[' '] && player.canJump && !player.isCrouching) {
+                player.yVel = 11.5; player.canJump = false;
             }
+            player.yVel -= 30.0 * delta; // Gravitācijas konstante
+            camera.position.y += player.yVel * delta;
 
-            // Gravitācijas spēks velk spēlētāju uz leju
-            player.yVelocity -= 32.0 * delta; 
-            camera.position.y += player.yVelocity * delta;
-
-            // Pārbauda vai spēlētājs ir piezemējies uz grīdas
             if (camera.position.y <= player.height) {
-                player.yVelocity = 0;
-                camera.position.y = player.height;
-                player.canJump = true;
+                player.yVel = 0; camera.position.y = player.height; player.canJump = true;
             }
 
-            // Dinamiskais tēmekļa izplešanās efekts (Kustība + Lēkšana)
-            const currentSpeed = velocity.length();
-            let spreadOffset = Math.min(12, currentSpeed * 0.8);
-            if (!player.canJump) {
-                spreadOffset = 22; // Maksimāls neprecizitātes vizuālais efekts gaisā
-            }
-            document.getElementById('ch-top').style.transform = `translateY(-${spreadOffset}px)`;
-            document.getElementById('ch-bottom').style.transform = `translateY(${spreadOffset}px)`;
-            document.getElementById('ch-left').style.transform = `translateX(-${spreadOffset}px)`;
-            document.getElementById('ch-right').style.transform = `translateX(${spreadOffset}px)`;
+            // Dinamiskais tēmekļa (Crosshair) izplešanās efekts
+            const cSpeed = velocity.length();
+            let spread = Math.min(10, cSpeed * 0.7);
+            if (!player.canJump) spread = 24; // Gaisā maksimāla neprecizitāte
+            if (player.isCrouching && player.canJump) spread = Math.max(0, spread - 4); // Tupot tēmeklis sašaurinās
 
-            // Sienu kolīzijas pārbaude (tikai X un Z asīm, lai netraucētu lēkšanai)
+            document.getElementById('ch-top').style.transform = `translateY(-${spread}px)`;
+            document.getElementById('ch-bottom').style.transform = `translateY(${spread}px)`;
+            document.getElementById('ch-left').style.transform = `translateX(-${spread}px)`;
+            document.getElementById('ch-right').style.transform = `translateX(${spread}px)`;
+
+            // Sienu sadursmju (Collision) pārbaude
             walls.forEach(wall => {
                 if (new THREE.Box3().setFromObject(wall).intersectsBox(new THREE.Box3(
-                    new THREE.Vector3(camera.position.x-0.7, camera.position.y-2, camera.position.z-0.7),
-                    new THREE.Vector3(camera.position.x+0.7, camera.position.y+2, camera.position.z+0.7)
-                ))) { 
-                    camera.position.x = oldPos.x;
-                    camera.position.z = oldPos.z;
-                }
+                    new THREE.Vector3(camera.position.x-0.7, camera.position.y-1.5, camera.position.z-0.7),
+                    new THREE.Vector3(camera.position.x+0.7, camera.position.y+1.5, camera.position.z+0.7)
+                ))) { camera.position.x = oldPos.x; camera.position.z = oldPos.z; }
             });
 
-            // 2. Ieroča pozīcija (Bobbing & Sway)
+            // 2. IEROČA DINAMIKA (Bobbing & Sway)
             gunGroup.position.copy(camera.position);
             gunGroup.quaternion.copy(camera.quaternion);
 
-            let tX = 0.16, tY = -0.22, tZ = -0.45;
-            if (player.isReloading) { tY = -0.45; tX = 0.12; }
+            let tX = 0.15, tY = -0.2, tZ = -0.42;
+            if (player.isReloading) { tY = -0.42; tX = 0.1; }
 
-            // Šūpo ieroci tikai tad, kad ir uz zemes un skrien
+            // Ieroča šūpošanās (Bobbing) ejot pa zemi
             if ((keys.w || keys.s || keys.a || keys.d) && player.canJump) {
-                bobTime += delta * 12;
-                tY += Math.sin(bobTime) * 0.014;
-                tX += Math.cos(bobTime / 2) * 0.008;
+                let factor = player.isCrouching ? 6 : 12;
+                bobTime += delta * factor;
+                tY += Math.sin(bobTime) * (player.isCrouching ? 0.006 : 0.013);
+                tX += Math.cos(bobTime / 2) * (player.isCrouching ? 0.004 : 0.008);
             }
 
-            tX -= mouseX * 0.0003;
-            tY += mouseY * 0.0003;
-            mouseX *= 0.85; mouseY *= 0.85;
+            // Ieroča atpalikšana pagriežoties (Sway efekts kā CS2)
+            tX -= lookX * 0.00035; tY += lookY * 0.00035;
+            lookX *= 0.84; lookY *= 0.84;
 
             gunGroup.translateX(tX); gunGroup.translateY(tY); gunGroup.translateZ(tZ);
             gunGroup.position.y = THREE.MathUtils.lerp(gunGroup.position.y, gunGroup.position.y, 0.1);
 
-            // 3. Botu AI un Šaušana
+            // 3. Botu AI Taktika un Uzbrukumi
             bots.forEach(bot => {
                 const dir = new THREE.Vector3().subVectors(camera.position, bot.position).normalize();
                 raycaster.set(bot.position, dir);
-                const intersects = raycaster.intersectObjects(walls);
+                const hit = raycaster.intersectObjects(walls);
                 const dToP = bot.position.distanceTo(camera.position);
 
-                if ((intersects.length === 0 || intersects[0].distance > dToP) && dToP < 50) {
-                    if (time - bot.lastShot > 1500) {
+                // Ja botam ir tieša redzamība uz tevi
+                if ((hit.length === 0 || hit[0].distance > dToP) && dToP < 55) {
+                    if (time - bot.lastShot > 1400) { // Šauj ik pēc 1.4s
                         bot.lastShot = time;
-                        player.hp -= 10;
+                        player.hp -= player.isCrouching ? 7 : 10; // Tupot saņem mazāk skādes (mazāks siluets)
                         updateHUD();
                         
-                        const lineGeo = new THREE.BufferGeometry().setFromPoints([bot.position.clone().add(new THREE.Vector3(0,1.4,0)), camera.position.clone().sub(new THREE.Vector3(0,0.3,0))]);
-                        const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xef4444 }));
-                        scene.add(line);
-                        setTimeout(() => scene.remove(line), 45);
+                        // Sarkanā aizlodējuma līnija (Bullet tracer)
+                        const tracerGeo = new THREE.BufferGeometry().setFromPoints([bot.position.clone().add(new THREE.Vector3(0,1.5,0)), camera.position.clone().sub(new THREE.Vector3(0,0.3,0))]);
+                        const tracer = new THREE.Line(tracerGeo, new THREE.LineBasicMaterial({ color: 0xf56565 }));
+                        scene.add(tracer); setTimeout(() => scene.remove(tracer), 40);
                     }
                 }
 
+                // Botu kustība — "Strafe" loģika, lai izvairītos no tavām lodēm
+                if (time > bot.nextStrafe) {
+                    bot.strafeDir = Math.random() > 0.5 ? 1 : -1;
+                    bot.nextStrafe = time + Math.random() * 2000 + 1000;
+                }
+
                 const botOld = bot.position.clone();
+                // Kustas uz priekšu, bet vienlaikus iet nedaudz sāņus (zig-zag)
+                const sideDir = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0,1,0)).normalize();
                 bot.position.addScaledVector(dir, 3.2 * delta);
-                bot.position.y = 1.4;
+                bot.position.addScaledVector(sideDir, bot.strafeDir * 2.0 * delta);
+                bot.position.y = 1.45;
+
                 walls.forEach(w => {
                     if(new THREE.Box3().setFromObject(w).intersectsBox(new THREE.Box3().setFromObject(bot))) bot.position.copy(botOld);
                 });
             });
 
-            // 4. Daļiņas
+            // 4. Daļiņu (Asins) Fizikas renderēšana
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
-                p.v.y -= 9.8 * delta;
-                p.mesh.position.addScaledVector(p.v, delta);
-                p.life -= delta * 1.2;
+                p.v.y -= 9.8 * delta; p.mesh.position.addScaledVector(p.v, delta);
+                p.life -= delta * 1.3;
                 if(p.mesh.position.y < 0.05) p.mesh.position.y = 0.05;
 
-                if (p.life <= 0) {
-                    scene.remove(p.mesh);
-                    particles.splice(i, 1);
-                }
+                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
             }
         }
 
@@ -501,8 +453,7 @@
     }
 
     window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
+        camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
