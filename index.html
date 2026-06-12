@@ -616,7 +616,7 @@ const GameCore = {
         },
 
         MountToCameraAnchor(weaponId) {
-            const targetAnchorHolder = GameCore.ThreeGraphicsManager.nestedGunMeshHolder;
+            const targetAnchorHolder = GameCore.ThreeGraphicsManager.nestedGunMeshWrapper;
             // Flush children
             while(targetAnchorHolder.children.length > 0) {
                 targetAnchorHolder.remove(targetAnchorHolder.children[0]);
