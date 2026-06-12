@@ -254,19 +254,13 @@
     </div>
 
 <script>
-/**
- * ============================================================================
- * COUNTER-STRIKE 2 GAME ENGINE ARCHITECTURE
- * ============================================================================
- */
-
-// Globālie mainīgie dzinējam un fizikai
 let keys = { w: false, a: false, s: false, d: false, ' ': false, shift: false };
 let velocity = new THREE.Vector3();
 let direction = new THREE.Vector3();
 let mouseRotation = new THREE.Euler(0, 0, 0, 'YXZ');
 let lastShotTimestamp = 0;
 let isLeftMousePressed = false;
+let clock = new THREE.Clock();
 
 const CoreEngine = {
     isLocked: false,
@@ -279,9 +273,9 @@ const CoreEngine = {
     WeaponArsenal: {
         pistol: { name: "USP-S", price: 0, clipMax: 12, reserveMax: 24, dmg: 34, rpm: 220, auto: false, weight: 1.0, spray: [{x:0,y:0},{x:0,y:0.01},{x:0.002,y:0.02}], recoil: 0.02, type:"sidearm" },
         deagle: { name: "Desert Eagle", price: 700, clipMax: 7, reserveMax: 35, dmg: 72, rpm: 450, auto: false, weight: 0.94, spray: [{x:0,y:0},{x:-0.01,y:0.05},{x:0.02,y:0.09}], recoil: 0.08, type:"sidearm" },
-        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 100, auto: true, weight: 0.89, spray: [{x:0,y:0},{x:0,y:0.01},{x:-0.003,y:0.02},{x:0.004,y:0.035},{x:-0.008,y:0.045},{x:0.01,y:0.05}], recoil: 0.03, type:"rifle" },
-        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 110, auto: true, weight: 0.86, spray: [{x:0,y:0},{x:0,y:0.015},{x:-0.005,y:0.03},{x:0.008,y:0.048},{x:-0.012,y:0.062},{x:0.015,y:0.075}], recoil: 0.04, type:"rifle" },
-        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 1300, auto: false, weight: 0.72, spray: [{x:0,y:0}], recoil: 0.15, type:"sniper" }
+        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 550, auto: true, weight: 0.89, spray: [{x:0,y:0},{x:0,y:0.01},{x:-0.003,y:0.02},{x:0.004,y:0.035}], recoil: 0.03, type:"rifle" },
+        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 600, auto: true, weight: 0.86, spray: [{x:0,y:0},{x:0,y:0.015},{x:-0.005,y:0.03},{x:0.008,y:0.048}], recoil: 0.04, type:"rifle" },
+        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 1200, auto: false, weight: 0.72, spray: [{x:0,y:0}], recoil: 0.15, type:"sniper" }
     },
 
     PlayerEntity: {
@@ -293,12 +287,12 @@ const CoreEngine = {
         isReloading: false,
         isWalking: false,
         isScoped: false,
-        baseSpeed: 16.0,
+        baseSpeed: 55.0,
         eyeHeight: 2.1,
         verticalVelocity: 0,
         canJump: true,
         recoilIndex: 0,
-        soundRadius: 0
+        radius: 1.2
     },
 
     init() {
@@ -309,7 +303,7 @@ const CoreEngine = {
         this.BotIntelligence.spawnSquad();
         this.InputController.bindEvents();
         this.InterfaceHUD.refresh();
-        this.EngineLoop.execute();
+        window.requestAnimationFrame((t) => this.EngineLoop.execute(t));
     },
 
     requestInterfaceLock() {
@@ -324,20 +318,17 @@ const CoreEngine = {
             this.scene.fog = new THREE.FogExp2(0x27354a, 0.012);
 
             this.camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.05, 1000);
-            this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+            this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.shadowMap.enabled = true;
-            this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(this.renderer.domElement);
 
-            const amb = new THREE.AmbientLight(0xffffff, 0.4);
+            const amb = new THREE.AmbientLight(0xffffff, 0.5);
             this.scene.add(amb);
             
             this.sun = new THREE.DirectionalLight(0xfff5ea, 1.1);
             this.sun.position.set(50, 85, 30);
             this.sun.castShadow = true;
-            this.sun.shadow.mapSize.width = 2048;
-            this.sun.shadow.mapSize.height = 2048;
             this.scene.add(this.sun);
 
             this.gunAnchor = new THREE.Group();
@@ -349,7 +340,6 @@ const CoreEngine = {
             CoreEngine.radarCanvas.height = 170;
             CoreEngine.radarCtx = CoreEngine.radarCanvas.getContext('2d');
             
-            // Sākotnējā pozīcija kartē
             this.camera.position.set(0, CoreEngine.PlayerEntity.eyeHeight, 40);
         }
     },
@@ -358,19 +348,27 @@ const CoreEngine = {
         mapStructures: [],
         smokeGrenadesMasivs: [],
 
-        addBlock(x, z, w, h, d, colorhex, roughnessVal = 0.8) {
+        addBlock(x, z, w, h, d, colorhex) {
             const geo = new THREE.BoxGeometry(w, h, d);
-            const mat = new THREE.MeshStandardMaterial({ color: colorhex, roughness: roughnessVal });
+            const mat = new THREE.MeshStandardMaterial({ color: colorhex, roughness: 0.8 });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.set(x, h / 2, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
+            
+            // Saglabājam datus sadursmēm bounding box formātā
+            mesh.geometry.computeBoundingBox();
+            mesh.updateMatrixWorld();
+            
             CoreEngine.ThreeSetup.scene.add(mesh);
-            this.mapStructures.push(mesh);
+            this.mapStructures.push({
+                mesh: mesh,
+                minX: x - w/2, maxX: x + w/2,
+                minZ: z - d/2, maxZ: z + d/2
+            });
         },
 
         generateDust2Map() {
-            // Zeme
             const groundGeo = new THREE.PlaneGeometry(250, 250);
             const groundMat = new THREE.MeshStandardMaterial({ color: 0x6e5d47, roughness: 0.95 });
             const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -378,13 +376,12 @@ const CoreEngine = {
             ground.receiveShadow = true;
             CoreEngine.ThreeSetup.scene.add(ground);
 
-            // Perimetra sienas
+            // Sienas un kastes
             this.addBlock(0, -115, 230, 14, 4, 0x8c7b64);
             this.addBlock(0, 115, 230, 14, 4, 0x8c7b64);
             this.addBlock(-115, 0, 4, 14, 230, 0x8c7b64);
             this.addBlock(115, 0, 4, 14, 230, 0x8c7b64);
 
-            // Dust 2 stila šķēršļi / Struktūras (A Site, B Site, Mid)
             this.addBlock(-45, -50, 40, 9, 8, 0x85735c);
             this.addBlock(45, -40, 8, 9, 55, 0x85735c);
             this.addBlock(0, -25, 65, 9, 6, 0x7a6953);
@@ -392,7 +389,6 @@ const CoreEngine = {
             this.addBlock(40, 60, 50, 9, 8, 0x7a6953);
             this.addBlock(-15, 65, 30, 9, 5, 0x85735c);
 
-            // Kastes
             this.addBlock(15, 15, 4.5, 4.5, 4.5, 0x9e5c1e);
             this.addBlock(19.5, 15, 4.0, 4.0, 4.0, 0x9e5c1e);
             this.addBlock(-50, 15, 5.5, 5.5, 5.5, 0x8c511a);
@@ -406,17 +402,12 @@ const CoreEngine = {
             smokeGroup.position.y = 1.0;
             CoreEngine.ThreeSetup.scene.add(smokeGroup);
 
-            const spheresCount = 25;
+            const spheresCount = 15;
             const subSpheres = [];
 
             for(let i=0; i<spheresCount; i++) {
-                const geo = new THREE.SphereGeometry(1.5 + Math.random()*2, 12, 12);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0xa0aec0, 
-                    roughness: 0.9, 
-                    transparent: true, 
-                    opacity: 0.75
-                });
+                const geo = new THREE.SphereGeometry(1.5 + Math.random()*2, 8, 8);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xa0aec0, roughness: 0.9, transparent: true, opacity: 0.7 });
                 const mesh = new THREE.Mesh(geo, mat);
                 
                 const angle = Math.random() * Math.PI * 2;
@@ -424,22 +415,13 @@ const CoreEngine = {
                 mesh.position.set(Math.cos(angle)*dist, Math.random()*3.0, Math.sin(angle)*dist);
                 
                 smokeGroup.add(mesh);
-                subSpheres.push({
-                    mesh: mesh,
-                    maxScale: 1.6 + Math.random(),
-                    currentScale: 0.1
-                });
+                subSpheres.push({ mesh: mesh, maxScale: 1.6 + Math.random(), currentScale: 0.1 });
             }
 
             this.smokeGrenadesMasivs.push({
-                group: smokeGroup,
-                spheres: subSpheres,
-                birth: performance.now(),
-                duration: 12000,
-                phase: "expand"
+                group: smokeGroup, spheres: subSpheres, birth: performance.now(), duration: 8000
             });
-            
-            CoreEngine.InterfaceHUD.logKillEvent("Dūmu Granāta Detonēta");
+            CoreEngine.InterfaceHUD.logKillEvent("Dūmu granāta detonēta");
         },
 
         updateSmokes(delta) {
@@ -457,9 +439,6 @@ const CoreEngine = {
                             s.currentScale += delta * 1.5;
                             s.mesh.scale.setScalar(s.currentScale);
                         }
-                        if (age > smk.duration - 2000) {
-                            s.mesh.material.opacity = Math.max(0, s.mesh.material.opacity - delta * 0.4);
-                        }
                     });
                 }
             }
@@ -468,72 +447,90 @@ const CoreEngine = {
 
     ProceduralModels: {
         compiledDecks: {},
-
         compileAll() {
-            // 1. USP-S
+            // USP-S
             const usp = new THREE.Group();
             const b1 = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.045, 0.16), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.14), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-            b2.rotation.x = Math.PI / 2; b2.position.set(0, 0.016, -0.1);
-            usp.add(b1, b2);
-            usp.position.set(0.15, -0.15, -0.3);
+            usp.add(b1); usp.position.set(0.15, -0.15, -0.3);
             this.compiledDecks["pistol"] = usp;
 
-            // 2. Desert Eagle
+            // Deagle
             const de = new THREE.Group();
-            const deb = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.2), new THREE.MeshStandardMaterial({ color: 0x475569 }));
-            const det = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.028, 0.16), new THREE.MeshStandardMaterial({ color: 0x334155 }));
-            det.position.set(0, 0.022, -0.11);
-            de.add(deb, det);
-            de.position.set(0.15, -0.15, -0.35);
+            const de1 = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.2), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+            de.add(de1); de.position.set(0.15, -0.15, -0.35);
             this.compiledDecks["deagle"] = de;
 
-            // 3. M4A4
+            // M4A4
             const m4 = new THREE.Group();
             const m4b = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.065, 0.34), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-            const m4bar = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.28), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            m4bar.rotation.x = Math.PI / 2; m4bar.position.set(0, 0.012, -0.24);
-            const m4mag = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.09, 0.065), new THREE.MeshStandardMaterial({ color: 0x1e2638 }));
-            m4mag.position.set(0, -0.065, -0.04); m4mag.rotation.x = 0.15;
-            m4.add(m4b, m4bar, m4mag);
-            m4.position.set(0.2, -0.2, -0.4);
+            m4.add(m4b); m4.position.set(0.2, -0.2, -0.4);
             this.compiledDecks["m4a4"] = m4;
 
-            // 4. AK-47
+            // AK-47
             const ak = new THREE.Group();
             const akb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.055, 0.36), new THREE.MeshStandardMaterial({ color: 0x111827 }));
-            const akw = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.042, 0.15), new THREE.MeshStandardMaterial({ color: 0x652b11 }));
-            akw.position.set(0, -0.004, -0.13);
-            const akbar = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.3), new THREE.MeshStandardMaterial({ color: 0x374151 }));
-            akbar.rotation.x = Math.PI / 2; akbar.position.set(0, 0.012, -0.27);
-            const akmag = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.11, 0.055), new THREE.MeshStandardMaterial({ color: 0x1f2937 }));
-            akmag.position.set(0, -0.07, -0.06); akmag.rotation.x = 0.28;
-            ak.add(akb, akw, akbar, akmag);
-            ak.position.set(0.2, -0.2, -0.4);
+            ak.add(akb); ak.position.set(0.2, -0.2, -0.4);
             this.compiledDecks["ak47"] = ak;
 
-            // 5. AWP
+            // AWP
             const awp = new THREE.Group();
             const awpb = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.075, 0.48), new THREE.MeshStandardMaterial({ color: 0x14532d }));
-            const awpbar = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.48), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-            awpbar.rotation.x = Math.PI / 2; awpbar.position.set(0, 0.016, -0.42);
-            const awpscope = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.18), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-            awpscope.rotation.x = Math.PI / 2; awpscope.position.set(0, 0.055, -0.06);
-            awp.add(awpb, awpbar, awpscope);
-            awp.position.set(0.22, -0.22, -0.5);
+            awp.add(awpb); awp.position.set(0.22, -0.22, -0.5);
             this.compiledDecks["awp"] = awp;
         },
-
         mount(type) {
             const anchor = CoreEngine.ThreeSetup.gunAnchor;
             while(anchor.children.length > 0) anchor.remove(anchor.children[0]);
-            
             const copy = this.compiledDecks[type].clone();
             anchor.add(copy);
+        }
+    },
 
-            const fl = new THREE.PointLight(0xffe29c, 0, 6);
-            fl.position.set(0, 0.01, -0.45);
-            anchor.add(fl);
+    BotIntelligence: {
+        bots: [],
+        spawnSquad() {
+            for(let i=0; i<4; i++) {
+                const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set((Math.random() - 0.5) * 80, 1.15, (Math.random() - 0.5) * 80 - 30);
+                CoreEngine.ThreeSetup.scene.add(mesh);
+
+                this.bots.push({
+                    mesh: mesh,
+                    hp: 100,
+                    lastShot: 0,
+                    shootInterval: 1200 + Math.random() * 800
+                });
+            }
+        },
+        update(delta, playerPos, now) {
+            this.bots.forEach(bot => {
+                if(bot.hp <= 0) return;
+
+                // Pavēršas pret spēlētāju
+                bot.mesh.lookAt(playerPos.x, bot.mesh.position.y, playerPos.z);
+
+                // Aprēķina distanci
+                let dist = bot.mesh.position.distanceTo(playerPos);
+                
+                // Ja redz spēlētāju un distance atļauj, botu inteliģence sāk uzbrukumu un šauj
+                if(dist < 70 && CoreEngine.PlayerEntity.hp > 0 && CoreEngine.isLocked) {
+                    if(now - bot.lastShot > bot.shootInterval) {
+                        bot.lastShot = now;
+                        // Pretinieki uzbrūk spēlētājam
+                        CoreEngine.PlayerEntity.hp -= Math.floor(Math.random() * 12) + 5;
+                        if(CoreEngine.PlayerEntity.hp < 0) CoreEngine.PlayerEntity.hp = 0;
+                        CoreEngine.InterfaceHUD.refresh();
+                        CoreEngine.InterfaceHUD.logKillEvent("Pretinieks iešāva tev!");
+
+                        if(CoreEngine.PlayerEntity.hp <= 0) {
+                            CoreEngine.InterfaceHUD.logKillEvent("TU ESI MIRIS! Spēle beigusies.");
+                            document.exitPointerLock();
+                        }
+                    }
+                }
+            });
         }
     },
 
@@ -541,15 +538,12 @@ const CoreEngine = {
         purchase(type) {
             const targetSpecs = CoreEngine.WeaponArsenal[type];
             const p = CoreEngine.PlayerEntity;
-            
             if (p.money >= targetSpecs.price) {
                 p.money -= targetSpecs.price;
                 p.activeGear = type;
                 p.ammoClips[type] = targetSpecs.clipMax;
                 p.ammoReserves[type] = targetSpecs.reserveMax;
-                
                 if (p.isScoped) this.breakScope();
-
                 CoreEngine.ProceduralModels.mount(type);
                 CoreEngine.InterfaceHUD.refresh();
                 CoreEngine.InterfaceHUD.logKillEvent("Iegādāts: " + targetSpecs.name);
@@ -558,7 +552,6 @@ const CoreEngine = {
                 CoreEngine.InterfaceHUD.logKillEvent("Nepietiek naudas!");
             }
         },
-
         breakScope() {
             const p = CoreEngine.PlayerEntity;
             p.isScoped = false;
@@ -568,7 +561,6 @@ const CoreEngine = {
             CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
             CoreEngine.ThreeSetup.gunAnchor.visible = true;
         },
-
         closeMenu() {
             document.getElementById('tactical-buy-menu').style.display = 'none';
             CoreEngine.isBuyOpen = false;
@@ -600,18 +592,21 @@ const CoreEngine = {
 
             document.addEventListener('mousemove', (e) => {
                 if (!CoreEngine.isLocked) return;
-
                 let sensitivity = CoreEngine.PlayerEntity.isScoped ? 0.0008 : 0.0022;
                 mouseRotation.y -= e.movementX * sensitivity;
                 mouseRotation.x -= e.movementY * sensitivity;
                 mouseRotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, mouseRotation.x));
-
                 CoreEngine.ThreeSetup.camera.quaternion.setFromEuler(mouseRotation);
             });
 
             document.addEventListener('keydown', (e) => {
-                const k = e.key === ' ' ? ' ' : e.key.toLowerCase();
-                if (k in keys) keys[k] = true;
+                const k = e.key.toLowerCase();
+                if (k === 'w') keys.w = true;
+                if (k === 'a') keys.a = true;
+                if (k === 's') keys.s = true;
+                if (k === 'd') keys.d = true;
+                if (e.key === ' ') keys[' '] = true;
+                if (e.key === 'Shift') keys.shift = true;
 
                 if (k === 'b' && CoreEngine.isLocked) {
                     CoreEngine.isBuyOpen = true;
@@ -620,27 +615,25 @@ const CoreEngine = {
                     document.getElementById('tactical-buy-menu').style.display = 'flex';
                     document.getElementById('dynamic-crosshair').style.display = 'none';
                 }
-                if (k === 'r' && CoreEngine.isLocked) {
-                    CoreEngine.EngineActions.initiateReload();
-                }
-                if (k === 'o' && CoreEngine.isLocked) {
-                    CoreEngine.EngineActions.throwSmokeGrenade();
-                }
+                if (k === 'r' && CoreEngine.isLocked) CoreEngine.EngineActions.initiateReload();
+                if (k === 'o' && CoreEngine.isLocked) CoreEngine.EngineActions.throwSmokeGrenade();
             });
 
             document.addEventListener('keyup', (e) => {
-                const k = e.key === ' ' ? ' ' : e.key.toLowerCase();
-                if (k in keys) keys[k] = false;
+                const k = e.key.toLowerCase();
+                if (k === 'w') keys.w = false;
+                if (k === 'a') keys.a = false;
+                if (k === 's') keys.s = false;
+                if (k === 'd') keys.d = false;
+                if (e.key === ' ') keys[' '] = false;
+                if (e.key === 'Shift') keys.shift = false;
             });
 
             document.addEventListener('mousedown', (e) => {
-                if (!CoreEngine.isLocked) return;
-                
+                if (!CoreEngine.isLocked || CoreEngine.PlayerEntity.hp <= 0) return;
                 if (e.button === 0) {
                     isLeftMousePressed = true;
-                    if (!CoreEngine.WeaponArsenal[CoreEngine.PlayerEntity.activeGear].auto) {
-                        CoreEngine.EngineActions.triggerWeaponShot();
-                    }
+                    CoreEngine.EngineActions.triggerWeaponShot();
                 }
                 if (e.button === 2 && CoreEngine.PlayerEntity.activeGear === "awp") {
                     CoreEngine.EngineActions.toggleSniperScope();
@@ -651,16 +644,7 @@ const CoreEngine = {
                 if (e.button === 0) isLeftMousePressed = false;
             });
 
-            // Atspējot labā klikšķa konteksta izvēlni spēlē
             document.addEventListener('contextmenu', e => e.preventDefault());
-
-            window.addEventListener('resize', () => {
-                const cam = CoreEngine.ThreeSetup.camera;
-                const ren = CoreEngine.ThreeSetup.renderer;
-                cam.aspect = window.innerWidth / window.innerHeight;
-                cam.updateProjectionMatrix();
-                ren.setSize(window.innerWidth, window.innerHeight);
-            });
         }
     },
 
@@ -683,176 +667,69 @@ const CoreEngine = {
             }, 1800);
         },
 
-        throwSmokeGrenade() {
-            let pos = CoreEngine.ThreeSetup.camera.position.clone();
-            let dir = new THREE.Vector3();
-            CoreEngine.ThreeSetup.camera.getWorldDirection(dir);
-            pos.addScaledVector(dir, 12);
-            pos.y = 0;
-            CoreEngine.EnvironmentBuilder.deploySmoke(pos);
+        triggerWeaponShot() {
+            const p = CoreEngine.PlayerEntity;
+            const w = CoreEngine.WeaponArsenal[p.activeGear];
+            const now = performance.now();
+
+            if(p.isReloading || p.ammoClips[p.activeGear] <= 0) return;
+            if(now - lastShotTimestamp < (60000 / w.rpm)) return;
+
+            lastShotTimestamp = now;
+            p.ammoClips[p.activeGear]--;
+            CoreEngine.InterfaceHUD.refresh();
+
+            // Raycasting precizitātei un pretinieku satriekšanai
+            const raycaster = new THREE.Raycaster();
+            const center = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(center, CoreEngine.ThreeSetup.camera);
+
+            const botMeshes = CoreEngine.BotIntelligence.bots.filter(b => b.hp > 0).map(b => b.mesh);
+            const intersects = raycaster.intersectObjects(botMeshes);
+
+            if(intersects.length > 0) {
+                let hitMesh = intersects[0].object;
+                let bot = CoreEngine.BotIntelligence.bots.find(b => b.mesh === hitMesh);
+                if(bot) {
+                    bot.hp -= w.dmg;
+                    CoreEngine.InterfaceHUD.logKillEvent("HITS pretiniekam! -" + w.dmg);
+                    if(bot.hp <= 0) {
+                        bot.mesh.position.y = -5; // Paslēpj mirušo botu
+                        CoreEngine.scoreCT++;
+                        p.money += 300;
+                        CoreEngine.InterfaceHUD.logKillEvent("PRESTINIEKS LIKVIDĒTS! +$300");
+                        CoreEngine.InterfaceHUD.refresh();
+                    }
+                }
+            }
         },
 
         toggleSniperScope() {
             const p = CoreEngine.PlayerEntity;
             p.isScoped = !p.isScoped;
-            
             const overlay = document.getElementById('sniper-scope-overlay');
-            const crosshair = document.getElementById('dynamic-crosshair');
-
+            const cross = document.getElementById('dynamic-crosshair');
+            
             if(p.isScoped) {
                 overlay.style.display = 'block';
-                crosshair.style.display = 'none';
-                CoreEngine.ThreeSetup.camera.fov = 18;
+                cross.style.display = 'none';
+                CoreEngine.ThreeSetup.camera.fov = 20;
                 CoreEngine.ThreeSetup.gunAnchor.visible = false;
             } else {
                 overlay.style.display = 'none';
-                crosshair.style.display = 'block';
+                cross.style.display = 'block';
                 CoreEngine.ThreeSetup.camera.fov = 74;
                 CoreEngine.ThreeSetup.gunAnchor.visible = true;
             }
             CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
         },
 
-        triggerWeaponShot() {
-            const p = CoreEngine.PlayerEntity;
-            const wSpecs = CoreEngine.WeaponArsenal[p.activeGear];
-            const now = performance.now();
-
-            if (p.ammoClips[p.activeGear] <= 0 || p.isReloading || now - lastShotTimestamp < wSpecs.rpm) {
-                if(p.ammoClips[p.activeGear] <= 0 && isLeftMousePressed) this.initiateReload();
-                return;
-            }
-
-            p.ammoClips[p.activeGear]--;
-            lastShotTimestamp = now;
-            CoreEngine.InterfaceHUD.refresh();
-
-            p.soundRadius = p.activeGear === "awp" ? 95 : 55;
-
-            // Vizuālais atsitiens (Recoil effect)
-            CoreEngine.ThreeSetup.gunAnchor.position.z += wSpecs.recoil * 1.1;
-            CoreEngine.ThreeSetup.gunAnchor.position.y += wSpecs.recoil * 0.3;
-
-            const flash = CoreEngine.ThreeSetup.gunAnchor.children[0];
-            
-            // Raycasting precizitāte ar izkliedi
-            const ray = new THREE.Raycaster();
-            let spread = (Math.random() - 0.5) * (velocity.length() * 0.004);
-            if (!p.canJump) spread *= 5;
-
-            ray.setFromCamera(new THREE.Vector2(spread, spread), CoreEngine.ThreeSetup.camera);
-
-            const botsToIntersect = CoreEngine.BotIntelligence.spawnedBotsList.map(b => b.mesh);
-            const botTargets = ray.intersectObjects(botsToIntersect, true);
-            const wallTargets = ray.intersectObjects(CoreEngine.EnvironmentBuilder.mapStructures);
-
-            let bD = botTargets.length > 0 ? botTargets[0].distance : Infinity;
-            let wD = wallTargets.length > 0 ? wallTargets[0].distance : Infinity;
-
-            if (botTargets.length > 0 && bD < wD) {
-                let hitMesh = botTargets[0].object;
-                let rootBot = hitMesh.userData.parentBot;
-                
-                if (rootBot && rootBot.alive) {
-                    let isHead = hitMesh === rootBot.headMesh;
-                    let finalDmg = isHead ? wSpecs.dmg * 4 : wSpecs.dmg;
-                    
-                    rootBot.hp -= finalDmg;
-                    if (rootBot.hp <= 0) {
-                        CoreEngine.BotIntelligence.terminate(rootBot, true);
-                    } else {
-                        CoreEngine.InterfaceHUD.logKillEvent("Ienaidniekam nodarīti " + Math.floor(finalDmg) + " HP");
-                    }
-                }
-            }
-        }
-    },
-
-    BotIntelligence: {
-        spawnedBotsList: [],
-
-        spawnSquad() {
-            for(let i=0; i<5; i++) {
-                this.createBot( (Math.random()-0.5)*140, (Math.random()-0.5)*140 );
-            }
-        },
-
-        createBot(x, z) {
-            const botGroup = new THREE.Group();
-            
-            // Ķermenis
-            const torso = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.9), new THREE.MeshStandardMaterial({ color: 0x991b1b }));
-            torso.position.y = 1.1;
-            torso.castShadow = true;
-            botGroup.add(torso);
-
-            // Galva
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 10), new THREE.MeshStandardMaterial({ color: 0xfca5a5 }));
-            head.position.y = 2.5;
-            head.castShadow = true;
-            botGroup.add(head);
-
-            botGroup.position.set(x, 0, z);
-            CoreEngine.ThreeSetup.scene.add(botGroup);
-
-            let botObject = {
-                mesh: botGroup,
-                headMesh: head,
-                hp: 100,
-                alive: true,
-                targetX: x,
-                targetZ: z,
-                speed: 6.5
-            };
-
-            torso.userData.parentBot = botObject;
-            head.userData.parentBot = botObject;
-
-            this.spawnedBotsList.push(botObject);
-        },
-
-        updateAI(delta) {
-            this.spawnedBotsList.forEach(b => {
-                if(!b.alive) return;
-
-                // Vienkārša patrulēšanas loģika uz mērķi
-                let currentPos = b.mesh.position;
-                let distToTarget = Math.hypot(b.targetX - currentPos.x, b.targetZ - currentPos.z);
-
-                if(distToTarget < 2.0) {
-                    b.targetX = (Math.random() - 0.5) * 160;
-                    b.targetZ = (Math.random() - 0.5) * 160;
-                } else {
-                    let angle = Math.atan2(b.targetZ - currentPos.z, b.targetX - currentPos.x);
-                    b.mesh.position.x += Math.cos(angle) * b.speed * delta;
-                    b.mesh.position.z += Math.sin(angle) * b.speed * delta;
-                }
-            });
-        },
-
-        terminate(bot, playerKilled) {
-            bot.alive = false;
-            bot.mesh.rotation.z = Math.PI / 2; // Sabrukšanas simulācija
-            bot.mesh.position.y = 0.2;
-            
-            if(playerKilled) {
-                CoreEngine.scoreCT++;
-                CoreEngine.PlayerEntity.money += 300;
-                CoreEngine.InterfaceHUD.logKillEvent("PLAYER ⚔️ ENEMY (+$300)");
-            } else {
-                CoreEngine.scoreT++;
-            }
-
-            CoreEngine.InterfaceHUD.refresh();
-
-            // Respawn pēc 5 sekundēm
-            setTimeout(() => {
-                CoreEngine.ThreeSetup.scene.remove(bot.mesh);
-                let idx = this.spawnedBotsList.indexOf(bot);
-                if(idx > -1) this.spawnedBotsList.splice(idx, 1);
-                this.createBot((Math.random()-0.5)*140, (Math.random()-0.5)*140);
-                CoreEngine.InterfaceHUD.logKillEvent("Jauns ienaidnieks ieradās kartē.");
-            }, 5000);
+        throwSmokeGrenade() {
+            let pos = CoreEngine.ThreeSetup.camera.position.clone();
+            let dir = new THREE.Vector3();
+            CoreEngine.ThreeSetup.camera.getWorldDirection(dir);
+            pos.addScaledVector(dir, 12); // Nomet nedaudz uz priekšu
+            CoreEngine.EnvironmentBuilder.deploySmoke(pos);
         }
     },
 
@@ -860,126 +737,107 @@ const CoreEngine = {
         refresh() {
             const p = CoreEngine.PlayerEntity;
             const w = CoreEngine.WeaponArsenal[p.activeGear];
-
-            document.getElementById('val-node-hp').innerText = Math.max(0, Math.floor(p.hp));
+            document.getElementById('val-node-hp').innerText = p.hp;
             document.getElementById('val-node-cash').innerText = "$" + p.money;
             document.getElementById('val-node-ammo').innerText = p.ammoClips[p.activeGear] + " / " + p.ammoReserves[p.activeGear];
-            document.getElementById('val-node-wepname').innerText = "IEROCIS: " + w.name;
-            
+            document.getElementById('val-node-wepname').innerText = "GEAR: " + w.name;
             document.getElementById('header-score-ct').innerText = CoreEngine.scoreCT;
             document.getElementById('header-score-t').innerText = CoreEngine.scoreT;
         },
-
         logKillEvent(text) {
             const logger = document.getElementById('kill-logger');
             const card = document.createElement('div');
-            card.className = "kill-card";
+            card.className = 'kill-card';
             card.innerText = text;
             logger.appendChild(card);
             setTimeout(() => card.remove(), 4500);
-        },
-
-        renderRadar() {
-            if (!CoreEngine.radarCtx) return;
-            let ctx = CoreEngine.radarCtx;
-            let pPos = CoreEngine.ThreeSetup.camera.position;
-
-            ctx.clearRect(0, 0, 170, 170);
-            
-            // Fons un režģis
-            ctx.fillStyle = "rgba(15, 23, 42, 0.6)";
-            ctx.fillRect(0, 0, 170, 170);
-
-            // Boti uz radara
-            CoreEngine.BotIntelligence.spawnedBotsList.forEach(b => {
-                if(!b.alive) return;
-                let relX = (b.mesh.position.x - pPos.x) * 1.2 + 85;
-                let relZ = (b.mesh.position.z - pPos.z) * 1.2 + 85;
-                
-                if(relX >= 0 && relX <= 170 && relZ >= 0 && relZ <= 170) {
-                    ctx.fillStyle = "#ef4444";
-                    ctx.beginPath();
-                    ctx.arc(relX, relZ, 4, 0, Math.PI*2);
-                    ctx.fill();
-                }
-            });
         }
     },
 
     EngineLoop: {
-        lastTimestamp: performance.now(),
+        execute(timestamp) {
+            window.requestAnimationFrame((t) => this.execute(t));
 
-        execute() {
-            requestAnimationFrame(() => CoreEngine.EngineLoop.execute());
+            let delta = clock.getDelta();
+            if (delta > 0.1) delta = 0.1; // Nogriež milzīgus lēcienus lagos
 
-            let now = performance.now();
-            let delta = (now - this.lastTimestamp) / 1000;
-            this.lastTimestamp = now;
+            const p = CoreEngine.PlayerEntity;
+            const cam = CoreEngine.ThreeSetup.camera;
 
-            if (delta > 0.15) delta = 0.15; // Aizsardzība pret lieliem kadru zudumiem
-
-            if (CoreEngine.isLocked) {
-                // Fizika un Kustība
-                let p = CoreEngine.PlayerEntity;
-                let cam = CoreEngine.ThreeSetup.camera;
-
-                // Berze / Slīdēšanas palēninājums
-                velocity.x -= velocity.x * 9.0 * delta;
-                velocity.z -= velocity.z * 9.0 * delta;
-
-                direction.z = Number(keys.w) - Number(keys.s);
-                direction.x = Number(keys.a) - Number(keys.d);
-                direction.normalize();
-
-                let currentMoveSpeed = p.baseSpeed;
-                if(keys.shift) currentMoveSpeed *= 0.45; // SHIFT lēnā staigāšana
-
-                // Aprēķināt virzienu attiecībā pret skatu
-                const camRotation = new THREE.Euler(0, mouseRotation.y, 0, 'YXZ');
-                let moveVector = new THREE.Vector3(direction.x, 0, direction.z).applyEuler(camRotation);
-                
-                velocity.addScaledVector(moveVector, currentMoveSpeed * 8.0 * delta);
-
-                cam.position.addScaledVector(velocity, delta);
-
-                // Gravitācija un lēkšana
-                if (!p.canJump) {
-                    p.verticalVelocity -= 22.0 * delta;
-                    cam.position.y += p.verticalVelocity * delta;
-
-                    if (cam.position.y <= p.eyeHeight) {
-                        cam.position.y = p.eyeHeight;
-                        p.verticalVelocity = 0;
-                        p.canJump = true;
-                    }
-                }
-
-                if (keys[' '] && p.canJump) {
-                    p.verticalVelocity = 7.5;
-                    p.canJump = false;
-                }
-
-                // Automātisko ieroču nepārtraukta šaušana
-                if (isLeftMousePressed && CoreEngine.WeaponArsenal[p.activeGear].auto) {
+            if (CoreEngine.isLocked && p.hp > 0) {
+                // Automātiskā uguns automātiem
+                const w = CoreEngine.WeaponArsenal[p.activeGear];
+                if (isLeftMousePressed && w.auto) {
                     CoreEngine.EngineActions.triggerWeaponShot();
                 }
 
-                // Atgriezt ieroci sākuma pozīcijā pēc atsitiena
-                CoreEngine.ThreeSetup.gunAnchor.position.z -= (CoreEngine.ThreeSetup.gunAnchor.position.z - (-0.3)) * 0.15;
-                CoreEngine.ThreeSetup.gunAnchor.position.y -= (CoreEngine.ThreeSetup.gunAnchor.position.y - (-0.15)) * 0.15;
+                // 1. ĀTRUMA UN KUSTĪBAS MATEMĀTIKA (Pareizi virzieni)
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
 
-                // Dinamiskie dūmi un AI atjaunināšana
+                direction.z = Number(keys.w) - Number(keys.s);
+                direction.x = Number(keys.d) - Number(keys.a);
+                direction.normalize();
+
+                let currentSpeed = p.baseSpeed;
+                if (keys.shift) currentSpeed *= 0.4;
+
+                if (keys.w || keys.s) velocity.z -= direction.z * currentSpeed * delta;
+                if (keys.a || keys.d) velocity.x -= direction.x * currentSpeed * delta;
+
+                // Saglabājam veco pozīciju pirms kustības pielietošanas sienas pārbaudei
+                let vecaPozicijaX = cam.position.x;
+                let vecaPozicijaZ = cam.position.z;
+
+                // Pārvietojam kameru lokālajos virzienos
+                cam.moveRight(-velocity.x * delta);
+                cam.moveForward(-velocity.z * delta);
+                cam.position.y = p.eyeHeight;
+
+                // 2. SADURSMJU SISTĒMA (Lai neietu cauri sienām)
+                CoreEngine.EnvironmentBuilder.mapStructures.forEach(struct => {
+                    if (cam.position.x + p.radius > struct.minX && cam.position.x - p.radius < struct.maxX &&
+                        cam.position.z + p.radius > struct.minZ && cam.position.z - p.radius < struct.maxZ) {
+                        // Ja notiek sadursme, atgriež spēlētāju atpakaļ
+                        cam.position.x = vecaPozicijaX;
+                        cam.position.z = vecaPozicijaZ;
+                    }
+                });
+
+                // Robežas, lai neizkristu no kartes
+                if (cam.position.x > 110) cam.position.x = 110;
+                if (cam.position.x < -110) cam.position.x = -110;
+                if (cam.position.z > 110) cam.position.z = 110;
+                if (cam.position.z < -110) cam.position.z = -110;
+
+                // Botu un dūmu atjaunināšana
+                CoreEngine.BotIntelligence.update(delta, cam.position, timestamp);
                 CoreEngine.EnvironmentBuilder.updateSmokes(delta);
-                CoreEngine.BotIntelligence.updateAI(delta);
-                CoreEngine.InterfaceHUD.renderRadar();
             }
 
-            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, CoreEngine.ThreeSetup.camera);
+            // Radara zīmēšana HUD saskarnē
+            if (CoreEngine.isLocked) {
+                const ctx = CoreEngine.radarCtx;
+                ctx.clearRect(0, 0, 170, 170);
+                ctx.fillStyle = "#1e293b";
+                
+                // Centrs ir 85, 85
+                CoreEngine.BotIntelligence.bots.forEach(bot => {
+                    if (bot.hp <= 0) return;
+                    let relX = (bot.mesh.position.x - cam.position.x) * 1.2 + 85;
+                    let relZ = (bot.mesh.position.z - cam.position.z) * 1.2 + 85;
+                    ctx.beginPath();
+                    ctx.arc(relX, relZ, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = "#ef4444";
+                    ctx.fill();
+                });
+            }
+
+            CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
         }
     }
 };
 
-// Sākt dzinēju pēc lapas ielādes
 window.onload = () => {
     CoreEngine.init();
 };
