@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CyberStrike 3D | WebGL Tactical Simulation Engine</title>
     <style>
-        /* --- CORE INTERFACE RESET --- */
         body, html {
             margin: 0; padding: 0; overflow: hidden;
             width: 100%; height: 100%; background-color: #030712;
@@ -14,13 +13,11 @@
         }
         canvas { display: block; width: 100vw; height: 100vh; }
 
-        /* --- STYLISH HUD CONTAINER --- */
         #game-hud {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 10; display: none;
         }
 
-        /* Tactical Mini-Radar */
         #radar-container {
             position: absolute; top: 30px; left: 30px; width: 180px; height: 180px;
             background: rgba(15, 23, 42, 0.85); border: 2px solid #f59e0b;
@@ -39,7 +36,6 @@
             transform: translate(-50%, -100%); pointer-events: none; z-index: 4;
         }
 
-        /* Match Score Header */
         #match-dashboard {
             position: absolute; top: 25px; left: 50%; transform: translateX(-50%);
             color: #ffffff; background: rgba(9, 13, 22, 0.95); padding: 12px 40px;
@@ -51,7 +47,6 @@
         .score-t { color: #ef4444; text-shadow: 0 0 10px rgba(239,68,68,0.5); }
         #match-timer { font-size: 20px; color: #94a3b8; font-family: monospace; }
 
-        /* Realtime Combat Event Log */
         #killfeed-container {
             position: absolute; top: 35px; right: 30px; width: 380px;
             display: flex; flex-direction: column; gap: 8px; pointer-events: none;
@@ -69,7 +64,6 @@
             100% { opacity: 0; transform: translateX(80px); }
         }
 
-        /* Weapon & Vitals Control Bar */
         #vitals-control-panel {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             background: rgba(15, 23, 42, 0.95); border: 1px solid #475569;
@@ -84,14 +78,12 @@
         .node-ammo { color: #f59e0b; }
         .node-gearname { font-size: 16px; color: #94a3b8; border-left: 2px solid #334155; padding-left: 20px; }
 
-        /* Damage Screen Flash Overlay */
         #damage-flash {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: radial-gradient(circle, transparent 40%, rgba(239,68,68,0.4) 100%);
             pointer-events: none; z-index: 9; opacity: 0; transition: opacity 0.1s ease;
         }
 
-        /* --- INTERACTIVE CROSSHAIR --- */
         #tactical-crosshair {
             position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
             transform: translate(-50%, -50%); pointer-events: none; z-index: 15; display: none;
@@ -103,7 +95,6 @@
         #ch-right { top: 19px; right: 0; width: 10px; height: 2px; }
         #ch-dot { top: 19px; left: 19px; width: 2px; height: 2px; background: #10b981; }
 
-        /* --- SNIPER LENS OVERLAY --- */
         #sniper-scope-view {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: none; pointer-events: none; z-index: 20;
@@ -117,7 +108,6 @@
         .scope-axis-v { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: #000000; }
         .scope-blur-vignette { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.6) 100%); }
 
-        /* --- TACTICAL BUY MENU SYSTEM --- */
         #buy-menu-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(11, 17, 29, 0.92); z-index: 100; display: none;
@@ -152,7 +142,6 @@
         }
         .buy-close-btn:hover { background-color: #64748b; }
 
-        /* --- MAIN MENU INTERFACE --- */
         #main-menu-dashboard {
             position: absolute; width: 100%; height: 100%;
             background: radial-gradient(circle at center, #1e293b 0%, #030712 100%);
@@ -276,15 +265,9 @@
     </div>
 
 <script>
-/**
- * ==================================================================================
- * CYBERSTRIKE CORE SIMULATION ENGINE
- * ==================================================================================
- * Kods ir strukturēts modulāros un loģiski nodalītos objektos, nodrošinot pilnvērtīgu
- * 3D renderēšanas ciklu, fizikas sadursmes, mākslīgo intelektu un saskarnes pārvaldību.
- */
-
-// --- GLOBAL STATE MANAGEMENT VARIABLES ---
+// ==========================================
+// JAVASCRIPT DZINĒJA SĀKUMS
+// ==========================================
 let inputKeys = { w: false, a: false, s: false, d: false, ' ': false, shift: false };
 let movementVelocity = new THREE.Vector3();
 let movementDirection = new THREE.Vector3();
@@ -304,7 +287,6 @@ const GameCore = {
     cachedRadarCanvas: null,
     cachedRadarContext: null,
     
-    // Comprehensive Weapon Configuration Matrix (Balansēts ar CS parametriem)
     WeaponArsenalRegistry: {
         pistol: { id: "pistol", name: "USP-S Tactical", cost: 0, clipCapacity: 12, reserveCapacity: 24, damageOutput: 34, fireRateRpm: 380, isFullyAutomatic: false, recoilForce: 0.008, modelScale: 0.22, baseColor: 0x334155 },
         deagle: { id: "deagle", name: "Desert Eagle Elite", cost: 700, clipCapacity: 7, reserveCapacity: 35, damageOutput: 74, fireRateRpm: 240, isFullyAutomatic: false, recoilForce: 0.045, modelScale: 0.26, baseColor: 0x94a3b8 },
@@ -313,7 +295,6 @@ const GameCore = {
         awp:    { id: "awp",    name: "AWP HyperScope", cost: 4750, clipCapacity: 5, reserveCapacity: 30, damageOutput: 115, fireRateRpm: 48, isFullyAutomatic: false, recoilForce: 0.09, modelScale: 0.82, baseColor: 0x064e3b }
     },
 
-    // Local Player Configuration Entity
     PlayerDataStructure: {
         currentHp: 100,
         availableCash: 800,
@@ -331,7 +312,6 @@ const GameCore = {
         collisionBoundingRadius: 1.1
     },
 
-    // Initialization Sequence
     InitializeEngine() {
         this.ThreeGraphicsManager.BuildViewportEngine();
         this.ProceduralMapArchitect.ConstructTacticalSandscape();
@@ -342,7 +322,6 @@ const GameCore = {
         this.UserInterfaceHUD.ForceGlobalSynchronize();
         this.StartMatchCountdownTimer();
 
-        // Fire rendering cycle loop
         window.requestAnimationFrame((timeDelta) => this.EngineProcessingCycle.ProcessFrame(timeDelta));
     },
 
@@ -368,7 +347,6 @@ const GameCore = {
         }, 1000);
     },
 
-    // WebGL Context & Cameras
     ThreeGraphicsManager: {
         sceneInstance: null, cameraInstance: null, webGlRenderer: null, directionalSunlight: null, 
         cameraGunAttachmentAnchor: null, nestedGunMeshWrapper: null,
@@ -406,7 +384,6 @@ const GameCore = {
             this.directionalSunlight.shadow.bias = -0.0005;
             this.sceneInstance.add(this.directionalSunlight);
 
-            // Procedural Skybox dome mock
             const skyBoxGeometry = new THREE.SphereGeometry(600, 16, 16);
             const skyBoxMaterial = new THREE.MeshBasicMaterial({ color: 0x1e293b, side: THREE.BackSide });
             this.sceneInstance.add(new THREE.Mesh(skyBoxGeometry, skyBoxMaterial));
@@ -432,65 +409,45 @@ const GameCore = {
         }
     },
 
-    // Procedural Architecture and Map Design Environment Engine
     ProceduralMapArchitect: {
         staticCollisionBoxes: [],
         deployedSmokeVolumetrics: [],
 
         InjectStructuralBlock(x, z, width, height, depth, hexadecimalColor, angleY = 0) {
             const blockGeometry = new THREE.BoxGeometry(width, height, depth);
-            const blockMaterial = new THREE.MeshStandardMaterial({ 
-                color: hexadecimalColor, 
-                roughness: 0.85, 
-                metalness: 0.05 
-            });
+            const blockMaterial = new THREE.MeshStandardMaterial({ color: hexadecimalColor, roughness: 0.85, metalness: 0.05 });
             const blockMesh = new THREE.Mesh(blockGeometry, blockMaterial);
             blockMesh.position.set(x, height / 2, z);
             if(angleY !== 0) blockMesh.rotation.y = angleY;
             blockMesh.castShadow = true;
             blockMesh.receiveShadow = true;
-            
             GameCore.ThreeGraphicsManager.sceneInstance.add(blockMesh);
-            
-            // Construct structural collision tracking data
             blockMesh.updateMatrixWorld();
             const uniqueBoundingBox = new THREE.Box3().setFromObject(blockMesh);
             this.staticCollisionBoxes.push(uniqueBoundingBox);
         },
 
         ConstructTacticalSandscape() {
-            // Ground Plane
             const groundPlaneGeo = new THREE.PlaneGeometry(400, 400);
-            const groundPlaneMat = new THREE.MeshStandardMaterial({ 
-                color: 0xc2a68d, 
-                roughness: 0.95 
-            });
+            const groundPlaneMat = new THREE.MeshStandardMaterial({ color: 0xc2a68d, roughness: 0.95 });
             const groundPlaneMesh = new THREE.Mesh(groundPlaneGeo, groundPlaneMat);
             groundPlaneMesh.rotation.x = -Math.PI / 2;
             groundPlaneMesh.receiveShadow = true;
             GameCore.ThreeGraphicsManager.sceneInstance.add(groundPlaneMesh);
 
-            // Boundary Exterior Defenses (Outer Enclosure Walls)
             this.InjectStructuralBlock(0, -180, 360, 24, 8, 0x9c7c63);
             this.InjectStructuralBlock(0, 180, 360, 24, 8, 0x9c7c63);
             this.InjectStructuralBlock(-180, 0, 8, 24, 360, 0x9c7c63);
             this.InjectStructuralBlock(180, 0, 8, 24, 360, 0x9c7c63);
             
-            // Complex Central Combat Arena Architecture Layout
-            // Sector Alpha Hub
             this.InjectStructuralBlock(-60, -50, 40, 14, 40, 0xbda08a);
             this.InjectStructuralBlock(-60, 50, 45, 16, 35, 0xab8d76);
-            
-            // Sector Beta High Walls and Corridors
             this.InjectStructuralBlock(65, -70, 30, 18, 60, 0xbda08a);
             this.InjectStructuralBlock(70, 60, 40, 12, 50, 0xa3856e);
-            
-            // Central Divider and Crossroad Choke Points
             this.InjectStructuralBlock(0, -15, 75, 10, 15, 0x8f725c);
             this.InjectStructuralBlock(-15, 100, 20, 15, 60, 0x9c7c63);
             this.InjectStructuralBlock(110, 0, 50, 14, 25, 0xab8d76);
 
-            // Scatter Tactical Cover Props (Crates, Containers)
             this.InjectStructuralBlock(25, 30, 8, 8, 8, 0xd97706);
             this.InjectStructuralBlock(25, 38, 7, 7, 7, 0xb45309);
             this.InjectStructuralBlock(-25, 45, 9, 9, 9, 0xd97706);
@@ -498,7 +455,6 @@ const GameCore = {
             this.InjectStructuralBlock(100, -110, 12, 10, 12, 0x475569);
             this.InjectStructuralBlock(-120, 110, 14, 12, 14, 0x334155);
             
-            // Thin Angled Decorative Walls
             this.InjectStructuralBlock(-100, -110, 50, 16, 6, 0xbda08a, Math.PI / 4);
             this.InjectStructuralBlock(120, 120, 45, 16, 6, 0xab8d76, -Math.PI / 3);
         },
@@ -514,21 +470,12 @@ const GameCore = {
             
             for (let idx = 0; idx < cloudDensityAmount; idx++) {
                 const particleSphereGeo = new THREE.SphereGeometry(2.5 + Math.random() * 2.5, 8, 8);
-                const particleSphereMat = new THREE.MeshStandardMaterial({ 
-                    color: 0xe2e8f0, 
-                    roughness: 0.95, 
-                    transparent: true, 
-                    opacity: 0.0 // Starte ar nematāmu, izvēršas loopā
-                });
+                const particleSphereMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.95, transparent: true, opacity: 0.0 });
                 const particleMesh = new THREE.Mesh(particleSphereGeo, particleSphereMat);
                 
                 const circularAngle = Math.random() * Math.PI * 2;
                 const dispersionRadius = Math.random() * 8.5;
-                particleMesh.position.set(
-                    Math.cos(circularAngle) * dispersionRadius,
-                    Math.random() * 5.0,
-                    Math.sin(circularAngle) * dispersionRadius
-                );
+                particleMesh.position.set(Math.cos(circularAngle) * dispersionRadius, Math.random() * 5.0, Math.sin(circularAngle) * dispersionRadius);
                 
                 tacticalSmokeGroup.add(particleMesh);
                 internalCloudParticleReferences.push(particleMesh);
@@ -552,11 +499,10 @@ const GameCore = {
                     GameCore.ThreeGraphicsManager.sceneInstance.remove(activeSmokeEntity.assemblyGroup);
                     this.deployedSmokeVolumetrics.splice(idx, 1);
                 } else {
-                    // Pakāpeniska izgaišana un izplešanās simulācija
                     let lifeRatio = elapsedLifeTime / activeSmokeEntity.lifecycleDurationMs;
                     let targetOpacity = 0.88;
-                    if (lifeRatio < 0.1) targetOpacity = (lifeRatio / 0.1) * 0.88; // Fade in
-                    if (lifeRatio > 0.7) targetOpacity = (1.0 - (lifeRatio - 0.7) / 0.3) * 0.88; // Fade out
+                    if (lifeRatio < 0.1) targetOpacity = (lifeRatio / 0.1) * 0.88;
+                    if (lifeRatio > 0.7) targetOpacity = (1.0 - (lifeRatio - 0.7) / 0.3) * 0.88;
                     
                     activeSmokeEntity.particles.forEach(pReference => {
                         pReference.material.opacity = Math.max(0, targetOpacity);
@@ -567,7 +513,6 @@ const GameCore = {
         }
     },
 
-    // Procedural Solid Weapon Models Assembler
     WeaponModelFactory: {
         compiledWeaponMeshBlueprints: {},
 
@@ -577,13 +522,11 @@ const GameCore = {
                 const specData = WeaponSpecs[weaponKey];
                 const productGroup = new THREE.Group();
                 
-                // Receiver Base Assembly
                 const frameGeo = new THREE.BoxGeometry(specData.modelScale * 0.18, specData.modelScale * 0.3, specData.modelScale * 1.1);
                 const frameMat = new THREE.MeshStandardMaterial({ color: specData.baseColor, roughness: 0.5 });
                 const frameMesh = new THREE.Mesh(frameGeo, frameMat);
                 productGroup.add(frameMesh);
                 
-                // Extruded Barrel Assembly
                 const barrelGeo = new THREE.CylinderGeometry(specData.modelScale * 0.05, specData.modelScale * 0.05, specData.modelScale * 0.9, 6);
                 const barrelMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.3 });
                 const barrelMesh = new THREE.Mesh(barrelGeo, barrelMat);
@@ -591,7 +534,6 @@ const GameCore = {
                 barrelMesh.position.set(0, specData.modelScale * 0.06, -specData.modelScale * 0.8);
                 productGroup.add(barrelMesh);
                 
-                // Hand Grip Handle Assembly
                 const gripGeo = new THREE.BoxGeometry(specData.modelScale * 0.14, specData.modelScale * 0.45, specData.modelScale * 0.25);
                 const gripMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 });
                 const gripMesh = new THREE.Mesh(gripGeo, gripMat);
@@ -599,9 +541,7 @@ const GameCore = {
                 gripMesh.rotation.x = Math.PI / 12;
                 productGroup.add(gripMesh);
 
-                // Specific Weapon Component Accessories Addons
                 if (specData.id === "awp") {
-                    // Massive Scope Tube Integration
                     const scopeGeo = new THREE.CylinderGeometry(specData.modelScale * 0.06, specData.modelScale * 0.06, specData.modelScale * 0.5, 6);
                     const scopeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
                     const scopeMesh = new THREE.Mesh(scopeGeo, scopeMat);
@@ -610,49 +550,38 @@ const GameCore = {
                     productGroup.add(scopeMesh);
                 }
                 
-                // Store translated blueprint hierarchy reference
                 this.compiledWeaponMeshBlueprints[weaponKey] = productGroup;
             });
         },
 
         MountToCameraAnchor(weaponId) {
             const targetAnchorHolder = GameCore.ThreeGraphicsManager.nestedGunMeshWrapper;
-            // Flush children
             while(targetAnchorHolder.children.length > 0) {
                 targetAnchorHolder.remove(targetAnchorHolder.children[0]);
             }
-            
             const freshClone = this.compiledWeaponMeshBlueprints[weaponId].clone();
-            // Default Weapon alignment offset matrix configuration relative to viewport
             freshClone.position.set(0.24, -0.22, -0.45);
             targetAnchorHolder.add(freshClone);
         }
     },
 
-    // Automated Artificial Non-Player Character (Bot) Logic Framework
     BotSimulationIntelligence: {
         registeredBotRoster: [],
 
         PopulateEnemyForces() {
             const squadTotalHeadcount = 6;
-            const enemyGroupHexColor = 0xdc2626; // Red Threat Identification
+            const enemyGroupHexColor = 0xdc2626;
             
             for (let memberId = 0; memberId < squadTotalHeadcount; memberId++) {
                 const cylinderGeometry = new THREE.CylinderGeometry(0.65, 0.65, 2.3, 10);
-                const standardMaterial = new THREE.MeshStandardMaterial({ 
-                    color: enemyGroupHexColor, 
-                    roughness: 0.6,
-                    metalness: 0.1
-                });
+                const standardMaterial = new THREE.MeshStandardMaterial({ color: enemyGroupHexColor, roughness: 0.6, metalness: 0.1 });
                 const botMesh = new THREE.Mesh(cylinderGeometry, standardMaterial);
                 botMesh.castShadow = true;
                 botMesh.receiveShadow = true;
                 
-                // Disperse positions procedurally avoiding spawn kill overlaps
                 let rx = (Math.random() - 0.5) * 260;
                 let rz = (Math.random() - 0.5) * 260 - 40;
                 botMesh.position.set(rx, 1.15, rz);
-                
                 GameCore.ThreeGraphicsManager.sceneInstance.add(botMesh);
                 
                 this.registeredBotRoster.push({
@@ -672,20 +601,15 @@ const GameCore = {
             this.registeredBotRoster.forEach(botEntity => {
                 if (botEntity.healthPoints <= 0) return;
 
-                // Track and orient gaze towards player trajectory path
                 botEntity.meshInstance.lookAt(playerCurrentPosition.x, botEntity.meshInstance.position.y, playerCurrentPosition.z);
                 
-                // Procedural Pathfinding and Path Routing AI Logic Decisions Loop
                 if (currentTimestamp - botEntity.lastDecisionEpoch > 4000) {
                     botEntity.lastDecisionEpoch = currentTimestamp;
-                    
-                    // Decidir vai patrulēt vai uzbrukt
                     let distanceToTargetPlayer = botEntity.meshInstance.position.distanceTo(playerCurrentPosition);
+                    
                     if (distanceToTargetPlayer < 75.0 && Math.random() > 0.3) {
-                        // Aggressive Intercept Vector Injection
                         botEntity.movementTargetNode.copy(playerCurrentPosition);
                     } else {
-                        // Random Patrol Destination Selection Matrix
                         let randomExplorationOffsetRadius = 40;
                         botEntity.movementTargetNode.set(
                             botEntity.meshInstance.position.x + (Math.random() - 0.5) * randomExplorationOffsetRadius,
@@ -695,22 +619,16 @@ const GameCore = {
                     }
                 }
 
-                // Execute Spatial Translational Movement Vector Towards Targeted Nodes
                 let pathingDirectionVector = new THREE.Vector3().subVectors(botEntity.movementTargetNode, botEntity.meshInstance.position);
                 pathingDirectionVector.y = 0;
                 let stepLengthDistance = pathingDirectionVector.length();
                 
                 if (stepLengthDistance > 1.5) {
                     pathingDirectionVector.normalize();
-                    
-                    // Proactive Wall Boundary Collision Mitigation System
                     let potentialNextPosition = botEntity.meshInstance.position.clone().addScaledVector(pathingDirectionVector, botEntity.patrolSpeedVelocity * globalDeltaTime);
                     let localCollisionDetected = false;
                     
-                    let temporaryBotBox = new THREE.Box3().setFromCenterAndSize(
-                        potentialNextPosition, 
-                        new THREE.Vector3(1.3, 2.3, 1.3)
-                    );
+                    let temporaryBotBox = new THREE.Box3().setFromCenterAndSize(potentialNextPosition, new THREE.Vector3(1.3, 2.3, 1.3));
 
                     for (let idx = 0; idx < GameCore.ProceduralMapArchitect.staticCollisionBoxes.length; idx++) {
                         if (temporaryBotBox.intersectsBox(GameCore.ProceduralMapArchitect.staticCollisionBoxes[idx])) {
@@ -722,12 +640,10 @@ const GameCore = {
                     if (!localCollisionDetected) {
                         botEntity.meshInstance.position.copy(potentialNextPosition);
                     } else {
-                        // Force reassessment of target on wall hit
                         botEntity.lastDecisionEpoch = 0;
                     }
                 }
 
-                // Periodic Enemy Automaton Combat Firing Attack Emulation
                 if (Math.random() < 0.0035) {
                     let distanceToTargetPlayer = botEntity.meshInstance.position.distanceTo(playerCurrentPosition);
                     if (distanceToTargetPlayer < 60.0) {
@@ -738,7 +654,6 @@ const GameCore = {
         }
     },
 
-    // Financial Transaction Procurement Inventory Infrastructure
     InventoryManager: {
         PurchaseWeapon(weaponRegistryId) {
             const specItem = GameCore.WeaponArsenalRegistry[weaponRegistryId];
@@ -750,7 +665,6 @@ const GameCore = {
                 pEntity.ammoClipsInMagazines[weaponRegistryId] = specItem.clipCapacity;
                 pEntity.ammoReserveStorage[weaponRegistryId] = specItem.reserveCapacity;
                 
-                // Automatically terminate zoomed scope overlays on weapon transitions
                 pEntity.isOpticsScoped = false;
                 GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
                 GameCore.ThreeGraphicsManager.cameraInstance.updateProjectionMatrix();
@@ -779,7 +693,6 @@ const GameCore = {
         }
     },
 
-    // IO Device Peripheral Signal Router Controller Interrupt Link handler
     InteractionInputRouter: {
         RegisterHardwareEvents() {
             document.addEventListener('pointerlockchange', () => {
@@ -805,17 +718,13 @@ const GameCore = {
 
             document.addEventListener('mousemove', (mouseEvent) => {
                 if (!GameCore.isEnginePointerLocked) return;
-                
-                // Apply look reduction scalar values when tracking targets through high powered AWP lenses
                 let lookSensitivityScalar = GameCore.PlayerDataStructure.isOpticsScoped ? 0.0006 : 0.0022;
                 
                 cameraEulerRotation.y -= mouseEvent.movementX * lookSensitivityScalar;
                 cameraEulerRotation.x -= mouseEvent.movementY * lookSensitivityScalar;
                 
-                // Constrain look rotation matrices bounds vertically
                 let verticalLookLimit = Math.PI / 2.15;
                 cameraEulerRotation.x = Math.max(-verticalLookLimit, Math.min(verticalLookLimit, cameraEulerRotation.x));
-                
                 GameCore.ThreeGraphicsManager.cameraInstance.quaternion.setFromEuler(cameraEulerRotation);
             });
 
@@ -847,10 +756,8 @@ const GameCore = {
 
             document.addEventListener('mousedown', (mouseClickEvent) => {
                 if (!GameCore.isEnginePointerLocked) return;
-                
                 if (mouseClickEvent.button === 0) {
                     primaryMousePressed = true;
-                    // Semi automatic cycle override dispatch loop
                     if (!GameCore.WeaponArsenalRegistry[GameCore.PlayerDataStructure.equippedWeaponId].isFullyAutomatic) {
                         GameCore.EngineProcessingCycle.ExecuteBallisticRaycastDischarge();
                     }
@@ -864,12 +771,10 @@ const GameCore = {
                 if (mouseReleaseEvent.button === 0) primaryMousePressed = false;
             });
 
-            // Neutralize unwanted shell native context menu triggers inside game frame canvas
             document.addEventListener('contextmenu', eventNode => eventNode.preventDefault());
         }
     },
 
-    // User Interface Graphics Head-Up Display Manager
     UserInterfaceHUD: {
         ForceGlobalSynchronize() {
             const pData = GameCore.PlayerDataStructure;
@@ -889,22 +794,16 @@ const GameCore = {
             alertCardNode.className = "feed-item";
             alertCardNode.innerText = notificationText;
             containerNode.appendChild(alertCardNode);
-            
-            // Clean up node instances after animation sequence lapses out
             setTimeout(() => { alertCardNode.remove(); }, 3900);
         },
 
         RenderTacticalRadarBlips() {
             const ctxRef = GameCore.cachedRadarContext;
             if(!ctxRef) return;
-            
             ctxRef.clearRect(0, 0, 180, 180);
             
-            // Render Background Plate circular grid paths
             ctxRef.fillStyle = "rgba(15, 23, 42, 0.75)";
-            ctxRef.beginPath();
-            ctxRef.arc(90, 90, 90, 0, Math.PI * 2);
-            ctxRef.fill();
+            ctxRef.beginPath(); ctxRef.arc(90, 90, 90, 0, Math.PI * 2); ctxRef.fill();
             
             ctxRef.strokeStyle = "rgba(71, 85, 105, 0.5)";
             ctxRef.lineWidth = 1;
@@ -914,65 +813,48 @@ const GameCore = {
             const primaryPlayerCameraPos = GameCore.ThreeGraphicsManager.cameraInstance.position;
             const headingLookVector = new THREE.Vector3();
             GameCore.ThreeGraphicsManager.cameraInstance.getWorldDirection(headingLookVector);
-            
-            // Compute orientation rotation angles for blips translation transformations
             const absoluteAngleY = Math.atan2(headingLookVector.z, headingLookVector.x);
 
             ctxRef.save();
             ctxRef.translate(90, 90);
-            // Reverse rotate grid landscape space map alignment to accommodate fixed pointer HUD style
             ctxRef.rotate(-absoluteAngleY - Math.PI / 2);
 
-            // Traverse and map registered enemy arrays
             GameCore.BotSimulationIntelligence.registeredBotRoster.forEach(botUnit => {
                 if (botUnit.healthPoints <= 0) return;
-                
                 let relativeDeltaX = (botUnit.meshInstance.position.x - primaryPlayerCameraPos.x) * 0.95;
                 let relativeDeltaZ = (botUnit.meshInstance.position.z - primaryPlayerCameraPos.z) * 0.95;
-                
-                // Clamp distance to fit within boundary rings bounds circumference limits
                 let hypotenuseLength = Math.sqrt(relativeDeltaX * relativeDeltaX + relativeDeltaZ * relativeDeltaZ);
+                
                 if (hypotenuseLength > 82) {
                     relativeDeltaX = (relativeDeltaX / hypotenuseLength) * 82;
                     relativeDeltaZ = (relativeDeltaZ / hypotenuseLength) * 82;
                 }
-
                 ctxRef.fillStyle = "#ef4444";
-                ctxRef.beginPath();
-                ctxRef.arc(relativeDeltaX, relativeDeltaZ, 4.5, 0, Math.PI * 2);
-                ctxRef.fill();
+                ctxRef.beginPath(); ctxRef.arc(relativeDeltaX, relativeDeltaZ, 4.5, 0, Math.PI * 2); ctxRef.fill();
             });
-
             ctxRef.restore();
         }
     },
 
-    // Frame Execution Processing Pipeline Engine Crunches
     EngineProcessingCycle: {
         ProcessFrame(highResolutionTimestamp) {
             window.requestAnimationFrame((t) => GameCore.EngineProcessingCycle.ProcessFrame(t));
-            
             let frameDeltaS = cronoClock.getDelta();
-            // Cap erratic lag spike intervals to prevent physics wall clipping anomalies
             if (frameDeltaS > 0.08) frameDeltaS = 0.08;
 
             const playerEntityRef = GameCore.PlayerDataStructure;
             const activeWeaponSpecs = GameCore.WeaponArsenalRegistry[playerEntityRef.equippedWeaponId];
 
-            // Evaluate ongoing weapon weapon reloading state timelines
             if (playerEntityRef.isCurrentlyReloading && performance.now() > playerEntityRef.reloadCompleteTimestamp) {
                 playerEntityRef.isCurrentlyReloading = false;
-                
                 let missingCartridgesCount = activeWeaponSpecs.clipCapacity - playerEntityRef.ammoClipsInMagazines[playerEntityRef.equippedWeaponId];
                 let extractedTransferQuantity = Math.min(missingCartridgesCount, playerEntityRef.ammoReserveStorage[playerEntityRef.equippedWeaponId]);
                 
                 playerEntityRef.ammoClipsInMagazines[playerEntityRef.equippedWeaponId] += extractedTransferQuantity;
                 playerEntityRef.ammoReserveStorage[playerEntityRef.equippedWeaponId] -= extractedTransferQuantity;
-                
                 GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
             }
 
-            // Automatic sustained continuous fire execution pathway
             if (primaryMousePressed && activeWeaponSpecs.isFullyAutomatic && GameCore.isEnginePointerLocked) {
                 let msBetweenShotsLimit = 60000 / activeWeaponSpecs.fireRateRpm;
                 if (performance.now() - absoluteLastShotTime > msBetweenShotsLimit) {
@@ -981,33 +863,27 @@ const GameCore = {
                 }
             }
 
-            // Perform Spatial Physics Transformations when context viewport captures input controls focus
             if (GameCore.isEnginePointerLocked) {
                 movementDirection.z = Number(inputKeys.w) - Number(inputKeys.s);
                 movementDirection.x = Number(inputKeys.a) - Number(inputKeys.d);
                 movementDirection.normalize();
 
                 let contextualVelocityLimit = inputKeys.shift ? playerEntityRef.movementBaseVelocity * 0.42 : playerEntityRef.movementBaseVelocity;
-                if (playerEntityRef.isOpticsScoped) contextualVelocityLimit *= 0.30; // Scope movement speed reduction
+                if (playerEntityRef.isOpticsScoped) contextualVelocityLimit *= 0.30;
 
-                // Apply deceleration friction constants damping coefficients matrices
                 movementVelocity.x -= movementVelocity.x * 9.5 * frameDeltaS;
                 movementVelocity.z -= movementVelocity.z * 9.5 * frameDeltaS;
 
                 if (inputKeys.w || inputKeys.s) movementVelocity.z -= movementDirection.z * contextualVelocityLimit * frameDeltaS;
                 if (inputKeys.a || inputKeys.d) movementVelocity.x -= movementDirection.x * contextualVelocityLimit * frameDeltaS;
 
-                // Project test trajectories vectors and process bounding boxes checking sequences
                 let originalCoordinatesBackup = GameCore.ThreeGraphicsManager.cameraInstance.position.clone();
-                
                 GameCore.ThreeGraphicsManager.cameraInstance.moveRight(-movementVelocity.x * frameDeltaS);
                 GameCore.ThreeGraphicsManager.cameraInstance.moveForward(-movementVelocity.z * frameDeltaS);
 
-                // Gravity fall acceleration physics parameters computations
                 playerEntityRef.computedVerticalVelocity -= 9.8 * 4.2 * frameDeltaS;
                 GameCore.ThreeGraphicsManager.cameraInstance.position.y += playerEntityRef.computedVerticalVelocity * frameDeltaS;
 
-                // Handle ground intersection collision limits
                 if (GameCore.ThreeGraphicsManager.cameraInstance.position.y < playerEntityRef.cameraEyeHeightLevel) {
                     playerEntityRef.computedVerticalVelocity = 0.0;
                     GameCore.ThreeGraphicsManager.cameraInstance.position.y = playerEntityRef.cameraEyeHeightLevel;
@@ -1019,7 +895,6 @@ const GameCore = {
                     playerEntityRef.playerCanPerformJump = false;
                 }
 
-                // Rigid Wall Collision Resolution Logic Pass
                 let playerSimulatedBoundingBox = new THREE.Box3().setFromCenterAndSize(
                     GameCore.ThreeGraphicsManager.cameraInstance.position,
                     new THREE.Vector3(playerEntityRef.collisionBoundingRadius, 2.2, playerEntityRef.collisionBoundingRadius)
@@ -1027,14 +902,12 @@ const GameCore = {
 
                 for (let boxIdx = 0; boxIdx < GameCore.ProceduralMapArchitect.staticCollisionBoxes.length; boxIdx++) {
                     if (playerSimulatedBoundingBox.intersectsBox(GameCore.ProceduralMapArchitect.staticCollisionBoxes[boxIdx])) {
-                        // Revert positional vector transformations upon intersecting solid bodies surfaces
                         GameCore.ThreeGraphicsManager.cameraInstance.position.x = originalCoordinatesBackup.x;
                         GameCore.ThreeGraphicsManager.cameraInstance.position.z = originalCoordinatesBackup.z;
                         break;
                     }
                 }
 
-                // Procedural Gun Recoil Visual Kick Animation Interpolations
                 if (playerEntityRef.activeRecoilVisualDisplacement > 0.0) {
                     GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.position.z = playerEntityRef.activeRecoilVisualDisplacement * 2.2;
                     GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.position.y = playerEntityRef.activeRecoilVisualDisplacement * 0.4;
@@ -1044,59 +917,45 @@ const GameCore = {
                 }
             }
 
-            // Sync simulation system subcomponents pipelines updates
             GameCore.ProceduralMapArchitect.AnimateAndFilterSmokes();
             GameCore.BotSimulationIntelligence.CoordinateBehavioralDecisions(frameDeltaS, GameCore.ThreeGraphicsManager.cameraInstance.position);
             GameCore.UserInterfaceHUD.RenderTacticalRadarBlips();
             
-            // Output render camera projection viewport frame pass
-            GameCore.ThreeGraphicsManager.webGlRenderer.render(
-                GameCore.ThreeGraphicsManager.sceneInstance, 
-                GameCore.ThreeGraphicsManager.cameraInstance
-            );
-        } // End ProcessFrame Method
+            GameCore.ThreeGraphicsManager.webGlRenderer.render(GameCore.ThreeGraphicsManager.sceneInstance, GameCore.ThreeGraphicsManager.cameraInstance);
+        },
 
         InitiateWeaponReloadSequence() {
             const pObj = GameCore.PlayerDataStructure;
             const wObj = GameCore.WeaponArsenalRegistry[pObj.equippedWeaponId];
-            
-            if (pObj.isCurrentlyReloading || 
-                pObj.ammoClipsInMagazines[pObj.equippedWeaponId] === wObj.clipCapacity || 
-                pObj.ammoReserveStorage[pObj.equippedWeaponId] <= 0) {
-                return;
-            }
+            if (pObj.isCurrentlyReloading || pObj.ammoClipsInMagazines[pObj.equippedWeaponId] === wObj.clipCapacity || pObj.ammoReserveStorage[pObj.equippedWeaponId] <= 0) return;
             
             pObj.isCurrentlyReloading = true;
-            pObj.reloadCompleteTimestamp = performance.now() + 1900; // 1.9 seconds reload time cadence duration
+            pObj.reloadCompleteTimestamp = performance.now() + 1900;
             GameCore.UserInterfaceHUD.PushCombatEventNotification("🔀 Reloading system mechanisms...");
         },
 
         DeploySmokeScreenUtility() {
             const traceDirectionVector = new THREE.Vector3();
             GameCore.ThreeGraphicsManager.cameraInstance.getWorldDirection(traceDirectionVector);
-            
-            GameCore.ProceduralMapArchitect.DeployTacticalSmokeVolumetric(
-                GameCore.ThreeGraphicsManager.cameraInstance.position, 
-                traceDirectionVector
-            );
+            GameCore.ProceduralMapArchitect.DeployTacticalSmokeVolumetric(GameCore.ThreeGraphicsManager.cameraInstance.position, traceDirectionVector);
             GameCore.UserInterfaceHUD.PushCombatEventNotification("💨 Smoke tactical screen deployed.");
         },
 
         ToggleMechanicalOpticsScope() {
             const pEntityRef = GameCore.PlayerDataStructure;
-            if (pEntityRef.equippedWeaponId !== 'awp') return; // Restriction gate filter
-            
+            if (pEntityRef.equippedWeaponId !== 'awp') return;
             pEntityRef.isOpticsScoped = !pEntityRef.isOpticsScoped;
+            
             const scopeOverlayElement = document.getElementById('sniper-scope-view');
             const crosshairOverlayElement = document.getElementById('tactical-crosshair');
             
             if (pEntityRef.isOpticsScoped) {
-                GameCore.ThreeGraphicsManager.cameraInstance.fov = 18; // 4x Optical Zoom simulation magnification matrix
+                GameCore.ThreeGraphicsManager.cameraInstance.fov = 18;
                 scopeOverlayElement.style.display = 'block';
                 crosshairOverlayElement.style.display = 'none';
                 GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.visible = false;
             } else {
-                GameCore.ThreeGraphicsManager.cameraInstance.fov = 72; // Default perspective baseline FOV reset
+                GameCore.ThreeGraphicsManager.cameraInstance.fov = 72;
                 scopeOverlayElement.style.display = 'none';
                 crosshairOverlayElement.style.display = 'block';
                 GameCore.ThreeGraphicsManager.nestedGunMeshWrapper.visible = true;
@@ -1107,59 +966,42 @@ const GameCore = {
         ExecuteBallisticRaycastDischarge() {
             const pProfile = GameCore.PlayerDataStructure;
             const wSpecs = GameCore.WeaponArsenalRegistry[pProfile.equippedWeaponId];
-            
-            if (pProfile.isCurrentlyReloading || pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] <= 0) {
-                return;
-            }
+            if (pProfile.isCurrentlyReloading || pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] <= 0) return;
 
-            // Deduct ammunition assets from values storage arrays
             pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId]--;
             pProfile.activeRecoilVisualDisplacement = wSpecs.recoilForce;
             GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
 
-            // Construct central viewport screen geometric alignment axes for Raycasting operations
             const standardRaycaster = new THREE.Raycaster();
             const normalizedScreenCenterCoordinates = new THREE.Vector2(0, 0);
-            
             standardRaycaster.setFromCamera(normalizedScreenCenterCoordinates, GameCore.ThreeGraphicsManager.cameraInstance);
 
-            // Harvest array compilation of eligible valid ray impact targets mesh nodes
             let combatantMeshTargetsArray = [];
             GameCore.BotSimulationIntelligence.registeredBotRoster.forEach(enemyBot => {
-                if(enemyBot.healthPoints > 0) {
-                    combatantMeshTargetsArray.push(enemyBot.meshInstance);
-                }
+                if(enemyBot.healthPoints > 0) combatantMeshTargetsArray.push(enemyBot.meshInstance);
             });
 
             const raycastIntersectionsResultsList = standardRaycaster.intersectObjects(combatantMeshTargetsArray);
 
             if (raycastIntersectionsResultsList.length > 0) {
                 const targetIntersectedObjectRef = raycastIntersectionsResultsList[0].object;
-                
-                // Track down matching logical target container elements definitions
-                let customBotInstanceMatch = GameCore.BotSimulationIntelligence.registeredBotRoster.find(
-                    bElement => bElement.meshInstance === targetIntersectedObjectRef
-                );
+                let customBotInstanceMatch = GameCore.BotSimulationIntelligence.registeredBotRoster.find(bElement => bElement.meshInstance === targetIntersectedObjectRef);
 
                 if (customBotInstanceMatch) {
                     customBotInstanceMatch.healthPoints -= wSpecs.damageOutput;
                     GameCore.UserInterfaceHUD.PushCombatEventNotification(`🎯 Impact hit registered on target: -${wSpecs.damageOutput} HP`);
                     
                     if (customBotInstanceMatch.healthPoints <= 0) {
-                        // Purge mesh remnants from rendering layers space
                         GameCore.ThreeGraphicsManager.sceneInstance.remove(customBotInstanceMatch.meshInstance);
                         GameCore.scoreCounterCT++;
-                        pProfile.availableCash += 300; // Kill reward economy yield injection
+                        pProfile.availableCash += 300;
                         GameCore.UserInterfaceHUD.PushCombatEventNotification("💀 Threat eliminated. Combat bounty rewarded: +$300");
                         GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
                     }
                 }
             }
 
-            // Auto trigger reload mechanisms chains when clip registers fully depleted parameters
-            if (pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] === 0) {
-                this.InitiateWeaponReloadSequence();
-            }
+            if (pProfile.ammoClipsInMagazines[pProfile.equippedWeaponId] === 0) this.InitiateWeaponReloadSequence();
         },
 
         InflictDamageOnPlayerEntity(incomingDamagePoints) {
@@ -1169,7 +1011,6 @@ const GameCore = {
             playerProfile.currentHp -= incomingDamagePoints;
             GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
 
-            // Flash Screen boundary crimson shaders indicators overlays
             const flashViewNode = document.getElementById('damage-flash');
             flashViewNode.style.opacity = '1';
             setTimeout(() => { flashViewNode.style.opacity = '0'; }, 120);
@@ -1177,8 +1018,6 @@ const GameCore = {
             if (playerProfile.currentHp <= 0) {
                 GameCore.UserInterfaceHUD.PushCombatEventNotification("💀 Critical Failure: Terminated in action. Respawning...");
                 GameCore.scoreCounterT++;
-                
-                // Respawn sequence reset configurations
                 playerProfile.currentHp = 100;
                 GameCore.ThreeGraphicsManager.cameraInstance.position.set(0, playerProfile.cameraEyeHeightLevel, 60);
                 GameCore.UserInterfaceHUD.ForceGlobalSynchronize();
@@ -1187,7 +1026,6 @@ const GameCore = {
     }
 };
 
-// Bind entry engine boot tasks execution hooks to window environment loads lifetime loops
 window.onload = () => {
     GameCore.InitializeEngine();
 };
