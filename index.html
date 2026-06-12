@@ -307,8 +307,8 @@ const CoreEngine = {
         this.InputController.bindEvents();
         this.InterfaceHUD.refresh();
 
-        // MULTIPLAYER SAVIENOJUMS (Nomaini ar savu precīzo Render saiti)
-        socket = io("https://cs-go-3.onrender.com");
+        // Savienojamies ar serveri (atstājot tukšu, tas automātiski pieslēdzas pašreizējam hostam)
+        socket = io();
 
         socket.on("connect", () => {
             this.InterfaceHUD.logKillEvent("Savienots ar Multiplayer serveri!");
@@ -319,13 +319,16 @@ const CoreEngine = {
             if (!networkPlayers[data.id]) {
                 // Ja jauns spēlētājs, izveidojam viņam 3D ķermeni (zilu cilindru)
                 const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+                const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 });
                 const mesh = new THREE.Mesh(geo, mat);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
                 CoreEngine.ThreeSetup.scene.add(mesh);
                 networkPlayers[data.id] = mesh;
             }
-            // Kustinam citu spēlētāju
+            // Kustinam citu spēlētāju un pagriežam viņu
             networkPlayers[data.id].position.set(data.x, data.y, data.z);
+            networkPlayers[data.id].rotation.y = data.rotation;
         });
 
         // Dzēšam spēlētāju kurš atslēdzas
@@ -701,15 +704,12 @@ const CoreEngine = {
             if(p.isScoped) {
                 overlay.style.display = 'block';
                 ch.style.display = 'none';
-                CoreEngine.ThreeSetup.camera.fov = 18;
+                CoreEngine.ThreeSetup.camera.fov = 16;
+                CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
                 CoreEngine.ThreeSetup.gunAnchor.visible = false;
             } else {
-                overlay.style.display = 'none';
-                ch.style.display = 'block';
-                CoreEngine.ThreeSetup.camera.fov = 74;
-                CoreEngine.ThreeSetup.gunAnchor.visible = true;
+                CoreEngine.InventoryManager.breakScope();
             }
-            CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
         },
 
         triggerWeaponShot() {
@@ -717,38 +717,43 @@ const CoreEngine = {
             const w = CoreEngine.WeaponArsenal[p.activeGear];
             const now = performance.now();
 
-            if(p.isReloading || p.ammoClips[p.activeGear] <= 0) return;
-            
-            let cooldown = p.activeGear === "awp" ? 1400 : (60000 / w.rpm);
-            if(now - lastShotTimestamp < cooldown) return;
+            if(p.isReloading || p.ammoClips[p.activeGear] <= 0) {
+                if(p.ammoClips[p.activeGear] <= 0 && !p.isReloading) this.initiateReload();
+                return;
+            }
 
+            if(now - lastShotTimestamp < (60000 / w.rpm)) return;
             lastShotTimestamp = now;
+
             p.ammoClips[p.activeGear]--;
             CoreEngine.InterfaceHUD.refresh();
 
-            CoreEngine.ThreeSetup.gunAnchor.position.z += w.recoil;
-            setTimeout(() => { CoreEngine.ThreeSetup.gunAnchor.position.z = 0; }, 60);
+            // SAKĀRTOJAM RECOIL / ANIMĀCIJU
+            const gun = CoreEngine.ThreeSetup.gunAnchor;
+            gun.position.z += w.recoil * 1.5;
+            gun.rotation.x -= w.recoil * 0.5;
 
+            // RAYCAST ŠAUŠANA (HITSCAN LOĢIKA)
             const raycaster = new THREE.Raycaster();
-            const center = new THREE.Vector2(0, 0);
+            const center = new THREE.Vector2(0, 0); // Ekrāna centrs
             raycaster.setFromCamera(center, CoreEngine.ThreeSetup.camera);
 
+            // Pārbaudām pretiniekus (Botus)
             const botMeshes = CoreEngine.BotIntelligence.bots.filter(b => b.hp > 0).map(b => b.mesh);
             const intersects = raycaster.intersectObjects(botMeshes);
 
             if(intersects.length > 0) {
-                let hitMesh = intersects[0].object;
-                let bot = CoreEngine.BotIntelligence.bots.find(b => b.mesh === hitMesh);
-                if(bot) {
-                    bot.hp -= w.dmg;
-                    CoreEngine.InterfaceHUD.logKillEvent("Ievainots pretinieks (-" + w.dmg + " HP)");
-                    
-                    if(bot.hp <= 0) {
-                        CoreEngine.ThreeSetup.scene.remove(bot.mesh);
-                        CoreEngine.scoreCT++;
+                const hitMesh = intersects[0].object;
+                const targetBot = CoreEngine.BotIntelligence.bots.find(b => b.mesh === hitMesh);
+                if(targetBot) {
+                    targetBot.hp -= w.dmg;
+                    CoreEngine.InterfaceHUD.logKillEvent("Ietrāpīji pretiniekam! (-" + w.dmg + " HP)");
+                    if(targetBot.hp <= 0) {
+                        CoreEngine.ThreeSetup.scene.remove(hitMesh);
                         p.money += 300;
+                        CoreEngine.isBuyOpen ? null : p.money = Math.min(16000, p.money);
                         CoreEngine.InterfaceHUD.refresh();
-                        CoreEngine.InterfaceHUD.logKillEvent("PRETINIEKS LIKVIDĒTS! +$300");
+                        CoreEngine.InterfaceHUD.logKillEvent("TU NOVĀCI PRETINIEKU! +$300");
                     }
                 }
             }
@@ -772,57 +777,136 @@ const CoreEngine = {
             card.className = 'kill-card';
             card.innerText = text;
             logger.appendChild(card);
-            setTimeout(() => { card.remove(); }, 4500);
+            setTimeout(() => card.remove(), 4500);
         }
     },
 
     EngineLoop: {
         execute(timestamp) {
-            window.requestAnimationFrame((t) => this.execute(t));
+            window.requestAnimationFrame((t) => CoreEngine.EngineLoop.execute(t));
 
             let delta = clock.getDelta();
-            if (delta > 0.1) delta = 0.1;
+            if(delta > 0.1) delta = 0.1;
 
             const p = CoreEngine.PlayerEntity;
             const cam = CoreEngine.ThreeSetup.camera;
 
-            if (CoreEngine.isLocked && p.hp > 0) {
-                // Automātiskā šaušana
-                const w = CoreEngine.WeaponArsenal[p.activeGear];
-                if (isLeftMousePressed && w.auto) {
-                    CoreEngine.EngineActions.triggerWeaponShot();
-                }
-
-                // Kustības vadība
-                direction.z = Number(keys.w) - Number(keys.s);
-                direction.x = Number(keys.a) - Number(keys.d);
-                direction.normalize();
-
-                let currentSpeed = p.baseSpeed;
-                if (keys.shift) currentSpeed *= 0.4;
-
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
-
-                if (keys.w || keys.s) velocity.z -= direction.z * currentSpeed * delta;
-                if (keys.a || keys.d) velocity.x -= direction.x * currentSpeed * delta;
-
-                cam.translateX(-velocity.x * delta);
-                cam.translateZ(-velocity.z * delta);
-                cam.position.y = p.eyeHeight;
-
-                // SŪTĀM KOORDINĀTAS UZ SERVERI (Multiplayer reāllaika daļa)
-                if (socket && socket.connected) {
-                    socket.emit("gajiens", {
-                        x: cam.position.x,
-                        y: cam.position.y,
-                        z: cam.position.z
-                    });
-                }
+            // JA SPĒLE NAV BLOĶĒTA (PAUZE), NEKO NEDARĀM
+            if (!CoreEngine.isLocked) {
+                CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
+                return;
             }
 
+            // NEPARTRAUKTĀ ŠAUŠANA AUTOMĀTISKAJIEM IEROČIEM
+            if (isLeftMousePressed && CoreEngine.WeaponArsenal[p.activeGear].auto) {
+                CoreEngine.EngineActions.triggerWeaponShot();
+            }
+
+            // IEROČA ANIMĀCIJAS ATKOPŠANĀS (RECOIL DECAY)
+            const gun = CoreEngine.ThreeSetup.gunAnchor;
+            gun.position.z += (0 - gun.position.z) * 0.15;
+            gun.rotation.x += (0 - gun.rotation.x) * 0.15;
+
+            // KUSTĪBAS APRĒĶINS un SOURCE 2 SLĪDĒŠANA
+            direction.z = Number(keys.s) - Number(keys.w);
+            direction.x = Number(keys.d) - Number(keys.a);
+            direction.normalize();
+
+            let speedModifier = p.baseSpeed;
+            if (keys.shift) speedModifier *= 0.45; // SHIFT lēnā staigāšana
+            if (p.isScoped) speedModifier *= 0.3;  // AWP optikas lēnums
+
+            // Berze / Slīdēšana (Source 2 Friction)
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            velocity.y -= 9.8 * 3.5 * delta; // Gravitācija
+
+            if (direction.z !== 0) velocity.z += direction.z * speedModifier * delta;
+            if (direction.x !== 0) velocity.x += direction.x * speedModifier * delta;
+
+            cam.translateX(velocity.x * delta);
+            cam.translateZ(velocity.z * delta);
+            cam.position.y += velocity.y * delta;
+
+            // Grīdas sadursme (Collision)
+            if (cam.position.y < p.eyeHeight) {
+                velocity.y = 0;
+                cam.position.y = p.eyeHeight;
+                p.canJump = true;
+            }
+
+            // Lēkšana (SPACE)
+            if (keys[' '] && p.canJump) {
+                velocity.y = 13.5;
+                p.canJump = false;
+            }
+
+            // MAPES ROBEŽU UN SIENU SADURSME (WALL COLLISIONS)
+            CoreEngine.EnvironmentBuilder.mapStructures.forEach(str => {
+                let pad = p.radius;
+                if (cam.position.x > str.minX - pad && cam.position.x < str.maxX + pad &&
+                    cam.position.z > str.minZ - pad && cam.position.z < str.maxZ + pad) {
+                    
+                    // Ļoti vienkārša un droša sienu atgrūšana
+                    let dists = [
+                        { d: cam.position.x - (str.minX - pad), x: str.minX - pad, z: cam.position.z },
+                        { d: (str.maxX + pad) - cam.position.x, x: str.maxX + pad, z: cam.position.z },
+                        { d: cam.position.z - (str.minZ - pad), x: cam.position.x, z: str.minZ - pad },
+                        { d: (str.maxZ + pad) - cam.position.z, x: cam.position.x, z: str.maxZ + pad }
+                    ];
+                    dists.sort((a, b) => a.d - b.d);
+                    cam.position.x = dists[0].x;
+                    cam.position.z = dists[0].z;
+                }
+            });
+
+            // MULTIPLAYER: SŪTĀM SAVAS KOORDINĀTAS UN ROTĀCIJU SERVERIM
+            if (socket && socket.connected) {
+                socket.emit("kustiba", {
+                    x: cam.position.x,
+                    y: cam.position.y - 1.0, // nolaižam 3D modeli līdz zemei (no acu augstuma)
+                    z: cam.position.z,
+                    rotation: mouseRotation.y
+                });
+            }
+
+            // Atjauninām dūmu granātas un botus
             CoreEngine.EnvironmentBuilder.updateSmokes(delta);
-            CoreEngine.BotIntelligence.update(delta, cam.position, timestamp);
+            CoreEngine.BotIntelligence.update(delta, cam.position, performance.now());
+
+            // 2D RADARA ATJAUNINĀŠANA
+            let ctx = CoreEngine.radarCtx;
+            if(ctx) {
+                ctx.fillStyle = "#0f172a";
+                ctx.fillRect(0,0,170,170);
+                
+                // uzzīmējam spēlētāju radara centrā
+                ctx.fillStyle = "#de9b35";
+                ctx.beginPath(); ctx.arc(85, 85, 4, 0, Math.PI*2); ctx.fill();
+                
+                // pagriežam radara konusu
+                document.getElementById('radar-cone').style.transform = `translate(-50%, -100%) rotate(${mouseRotation.y}rad)`;
+
+                // Zīmējam Botus uz radara
+                CoreEngine.BotIntelligence.bots.forEach(b => {
+                    if(b.hp <= 0) return;
+                    let dx = (b.mesh.position.x - cam.position.x) * 0.8;
+                    let dz = (b.mesh.position.z - cam.position.z) * 0.8;
+                    ctx.fillStyle = "#ef4444";
+                    ctx.beginPath(); ctx.arc(85 + dx, 85 + dz, 3, 0, Math.PI*2); ctx.fill();
+                });
+
+                // Zīmējam citus Multiplayer spēlētājus uz radara
+                Object.keys(networkPlayers).forEach(id => {
+                    let np = networkPlayers[id];
+                    let dx = (np.position.x - cam.position.x) * 0.8;
+                    let dz = (np.position.z - cam.position.z) * 0.8;
+                    ctx.fillStyle = "#3b82f6";
+                    ctx.beginPath(); ctx.arc(85 + dx, 85 + dz, 3, 0, Math.PI*2); ctx.fill();
+                });
+            }
+
+            // RENDERĒJAM TRĪSDIMENSIJU PASAULI
             CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
         }
     }
