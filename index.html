@@ -81,11 +81,11 @@
             position: absolute; top: 50%; left: 50%; width: 50px; height: 50px;
             transform: translate(-50%, -50%); pointer-events: none; z-index: 4; display: none;
         }
-        .hair-segment { position: absolute; background: #10b981; box-shadow: 0 0 4px rgba(16,185,129,0.8); }
-        #hair-t { top: 0; left: 24px; width: 2px; height: 12px; }
-        #hair-b { bottom: 0; left: 24px; width: 2px; height: 12px; }
-        #hair-l { top: 24px; left: 0; width: 12px; height: 2px; }
-        #hair-r { top: 24px; right: 0; width: 12px; height: 2px; }
+        .hair-segment { position: absolute; background: #10b981; box-shadow: 0 0 4px rgba(16,185,129,0.8); transition: transform 0.05s ease; }
+        #hair-t { top: 0; left: 24px; width: 2px; height: 12px; transform-origin: bottom; }
+        #hair-b { bottom: 0; left: 24px; width: 2px; height: 12px; transform-origin: top; }
+        #hair-l { top: 24px; left: 0; width: 12px; height: 2px; transform-origin: right; }
+        #hair-r { top: 24px; right: 0; width: 12px; height: 2px; transform-origin: left; }
         #hair-c { top: 24px; left: 24px; width: 2px; height: 2px; background: #10b981; }
 
         /* --- SCOPE SHIELD --- */
@@ -98,8 +98,8 @@
             border-radius: 50%; border: 5px solid #000000; transform: translate(-50%, -50%);
             box-shadow: 0 0 0 3000px #000000; overflow: hidden;
         }
-        .lens-axis-h { position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(220, 38, 38, 0.75); }
-        .lens-axis-v { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(220, 38, 38, 0.75); }
+        .lens-axis-h { position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: rgba(0, 0, 0, 0.85); }
+        .lens-axis-v { position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(0, 0, 0, 0.85); }
         .lens-blur { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, transparent 55%, rgba(0,0,0,0.4) 100%); }
 
         /* --- INTERACTIVE BUY MENU (B) --- */
@@ -173,9 +173,9 @@
             <div class="instruction-grid">
                 <strong>W, A, S, D</strong> — Kustība & Taktiskā slīdēšana<br>
                 <strong>SHIFT (Turēt)</strong> — Klusa staigāšana<br>
-                <strong>SPACE</strong> — Lēkt | <strong>R</strong> — Pārlādēt<br>
+                <strong>SPACE</strong> — Lēkt | <strong>R</strong> — Pārlādēt ieroci<br>
                 <strong>B</strong> — Iepirkšanās izvēlne | <strong>O</strong> — Izmest DŪMU granātu<br>
-                <strong>Kreisais klikšķis</strong> — Šaut | <strong>Labais klikšķis</strong> — Optika
+                <strong>Kreisais klikšķis</strong> — Šaut (Automātiski AK/M4) | <strong>Labais klikšķis</strong> — Optika AWP
             </div>
         </div>
     </div>
@@ -274,11 +274,11 @@ const CoreEngine = {
     radarCtx: null,
     
     WeaponArsenal: {
-        pistol: { name: "USP-S", price: 0, clipMax: 12, reserveMax: 24, dmg: 34, rpm: 300, auto: false, weight: 1.0, recoil: 0.02, type:"sidearm" },
-        deagle: { name: "Desert Eagle", price: 700, clipMax: 7, reserveMax: 35, dmg: 72, rpm: 200, auto: false, weight: 0.94, recoil: 0.08, type:"sidearm" },
-        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 600, auto: true, weight: 0.89, recoil: 0.03, type:"rifle" },
-        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 550, auto: true, weight: 0.86, recoil: 0.04, type:"rifle" },
-        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 45, auto: false, weight: 0.72, recoil: 0.15, type:"sniper" }
+        pistol: { name: "USP-S", price: 0, clipMax: 12, reserveMax: 24, dmg: 34, rpm: 350, auto: false, recoil: 0.01, type:"sidearm" },
+        deagle: { name: "Desert Eagle", price: 700, clipMax: 7, reserveMax: 35, dmg: 72, rpm: 220, auto: false, recoil: 0.05, type:"sidearm" },
+        m4a4: { name: "M4A4", price: 3100, clipMax: 30, reserveMax: 90, dmg: 33, rpm: 600, auto: true, recoil: 0.02, type:"rifle" },
+        ak47: { name: "AK-47", price: 2700, clipMax: 30, reserveMax: 90, dmg: 40, rpm: 550, auto: true, recoil: 0.025, type:"rifle" },
+        awp: { name: "AWP", price: 4750, clipMax: 5, reserveMax: 30, dmg: 115, rpm: 45, auto: false, recoil: 0.12, type:"sniper" }
     },
 
     PlayerEntity: {
@@ -288,13 +288,14 @@ const CoreEngine = {
         ammoClips: { pistol: 12, deagle: 7, m4a4: 30, ak47: 30, awp: 5 },
         ammoReserves: { pistol: 24, deagle: 35, m4a4: 90, ak47: 90, awp: 30 },
         isReloading: false,
+        reloadEndTime: 0,
         isWalking: false,
         isScoped: false,
         baseSpeed: 55.0,
         eyeHeight: 2.1,
         verticalVelocity: 0,
         canJump: true,
-        recoilIndex: 0,
+        recoilVisual: 0,
         radius: 1.2
     },
 
@@ -307,32 +308,44 @@ const CoreEngine = {
         this.InputController.bindEvents();
         this.InterfaceHUD.refresh();
 
-        socket = io();
+        // Savienojums ar serveri (Paliek nemainīgs priekš multiplayer)
+        try {
+            socket = io();
+            socket.on("connect", () => {
+                this.InterfaceHUD.logKillEvent("Savienots ar serveri!");
+            });
 
-        socket.on("connect", () => {
-            this.InterfaceHUD.logKillEvent("Savienots ar serveri!");
-        });
+            socket.on("gajiens", (data) => {
+                if (!networkPlayers[data.id]) {
+                    const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
+                    const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    
+                    // Pievieno vizuālu stobru pretiniekiem, lai redzētu kur tēmē
+                    const gunGeo = new THREE.BoxGeometry(0.2, 0.2, 0.8);
+                    const gunMat = new THREE.MeshBasicMaterial({color: 0x111111});
+                    const gunMesh = new THREE.Mesh(gunGeo, gunMat);
+                    gunMesh.position.set(0, 0.5, -0.5);
+                    mesh.add(gunMesh);
 
-        socket.on("gajiens", (data) => {
-            if (!networkPlayers[data.id]) {
-                const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.5 });
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                CoreEngine.ThreeSetup.scene.add(mesh);
-                networkPlayers[data.id] = mesh;
-            }
-            networkPlayers[data.id].position.set(data.x, data.y + 1.15, data.z);
-            networkPlayers[data.id].rotation.y = data.rotation;
-        });
+                    CoreEngine.ThreeSetup.scene.add(mesh);
+                    networkPlayers[data.id] = mesh;
+                }
+                networkPlayers[data.id].position.set(data.x, data.y + 1.15, data.z);
+                networkPlayers[data.id].rotation.y = data.rotation;
+            });
 
-        socket.on("user-disconnected", (id) => {
-            if (networkPlayers[id]) {
-                CoreEngine.ThreeSetup.scene.remove(networkPlayers[id]);
-                delete networkPlayers[id];
-            }
-        });
+            socket.on("user-disconnected", (id) => {
+                if (networkPlayers[id]) {
+                    CoreEngine.ThreeSetup.scene.remove(networkPlayers[id]);
+                    delete networkPlayers[id];
+                }
+            });
+        } catch(e) {
+            console.log("Multiplayer serveris nav atrasts, darbojas offline režīms.");
+        }
 
         window.requestAnimationFrame((t) => this.EngineLoop.execute(t));
     },
@@ -342,27 +355,32 @@ const CoreEngine = {
     },
 
     ThreeSetup: {
-        scene: null, camera: null, renderer: null, sun: null, gunAnchor: null,
+        scene: null, camera: null, renderer: null, sun: null, gunAnchor: null, gunMeshHolder: null,
         assemble() {
             this.scene = new THREE.Scene();
-            this.scene.background = new THREE.Color(0x27354a);
-            this.scene.fog = new THREE.FogExp2(0x27354a, 0.012);
+            this.scene.background = new THREE.Color(0xdbeafe);
+            this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.008);
 
             this.camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.05, 1000);
             this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.shadowMap.enabled = true;
+            this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
             document.body.appendChild(this.renderer.domElement);
 
-            const amb = new THREE.AmbientLight(0xffffff, 0.5);
+            const amb = new THREE.AmbientLight(0xffffff, 0.6);
             this.scene.add(amb);
             
-            this.sun = new THREE.DirectionalLight(0xfff5ea, 1.1);
-            this.sun.position.set(50, 85, 30);
+            this.sun = new THREE.DirectionalLight(0xfff5ea, 1.4);
+            this.sun.position.set(60, 100, 40);
             this.sun.castShadow = true;
+            this.sun.shadow.mapSize.width = 2048;
+            this.sun.shadow.mapSize.height = 2048;
             this.scene.add(this.sun);
 
             this.gunAnchor = new THREE.Group();
+            this.gunMeshHolder = new THREE.Group();
+            this.gunAnchor.add(this.gunMeshHolder);
             this.camera.add(this.gunAnchor);
             this.scene.add(this.camera);
 
@@ -381,50 +399,57 @@ const CoreEngine = {
 
         addBlock(x, z, w, h, d, colorhex) {
             const geo = new THREE.BoxGeometry(w, h, d);
-            const mat = new THREE.MeshStandardMaterial({ color: colorhex, roughness: 0.8 });
+            const mat = new THREE.MeshStandardMaterial({ color: colorhex, roughness: 0.7 });
             const mesh = new THREE.Mesh(geo, mat);
             mesh.position.set(x, h / 2, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             CoreEngine.ThreeSetup.scene.add(mesh);
+            this.mapStructures.push(new THREE.Box3().setFromObject(mesh));
         },
 
         generateDust2Map() {
-            const groundGeo = new THREE.PlaneGeometry(250, 250);
-            const groundMat = new THREE.MeshStandardMaterial({ color: 0x6e5d47, roughness: 0.95 });
+            const groundGeo = new THREE.PlaneGeometry(300, 300);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0xd9c3b0, roughness: 0.9 });
             const ground = new THREE.Mesh(groundGeo, groundMat);
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
             CoreEngine.ThreeSetup.scene.add(ground);
 
-            this.addBlock(0, -115, 230, 14, 4, 0x8c7b64);
-            this.addBlock(0, 115, 230, 14, 4, 0x8c7b64);
-            this.addBlock(-115, 0, 4, 14, 230, 0x8c7b64);
-            this.addBlock(115, 0, 4, 14, 230, 0x8c7b64);
-            this.addBlock(-45, -50, 40, 9, 8, 0x85735c);
-            this.addBlock(45, -40, 8, 9, 55, 0x85735c);
-            this.addBlock(0, -25, 65, 9, 6, 0x7a6953);
+            // Dust 2 stila kastes un sienas
+            this.addBlock(0, -115, 230, 16, 6, 0xcca685);
+            this.addBlock(0, 115, 230, 16, 6, 0xcca685);
+            this.addBlock(-115, 0, 6, 16, 230, 0xcca685);
+            this.addBlock(115, 0, 6, 16, 230, 0xcca685);
+            
+            // Vidus un kastes taktiskajiem aizsegiem
+            this.addBlock(-45, -30, 25, 8, 25, 0xb08d71);
+            this.addBlock(45, -40, 12, 9, 45, 0xb08d71);
+            this.addBlock(0, -10, 40, 7, 10, 0x9c7659);
+            this.addBlock(15, 20, 6, 6, 6, 0xde9b35); // Kastes aizsegs
+            this.addBlock(-20, 40, 8, 8, 8, 0xde9b35);
         },
 
-        deploySmoke(position) {
+        deploySmoke(position, cameraDir) {
             const smokeGroup = new THREE.Group();
-            smokeGroup.position.copy(position);
+            // Izsviež uz priekšu nedaudz
+            smokeGroup.position.copy(position).addScaledVector(cameraDir, 5);
             smokeGroup.position.y = 1.0;
             CoreEngine.ThreeSetup.scene.add(smokeGroup);
 
-            for(let i=0; i<15; i++) {
-                const geo = new THREE.SphereGeometry(1.5 + Math.random()*2, 8, 8);
-                const mat = new THREE.MeshStandardMaterial({ color: 0xa0aec0, roughness: 0.9, transparent: true, opacity: 0.7 });
+            for(let i=0; i<25; i++) {
+                const geo = new THREE.SphereGeometry(2.0 + Math.random()*2, 10, 10);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.9, transparent: true, opacity: 0.85 });
                 const mesh = new THREE.Mesh(geo, mat);
                 const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * 4.5;
-                mesh.position.set(Math.cos(angle)*dist, Math.random()*3.0, Math.sin(angle)*dist);
+                const dist = Math.random() * 6.0;
+                mesh.position.set(Math.cos(angle)*dist, Math.random()*4.0, Math.sin(angle)*dist);
                 smokeGroup.add(mesh);
             }
-            this.smokeGrenadesMasivs.push({ group: smokeGroup, birth: performance.now(), duration: 8000 });
+            this.smokeGrenadesMasivs.push({ group: smokeGroup, birth: performance.now(), duration: 10000 });
         },
 
-        updateSmokes(delta) {
+        updateSmokes() {
             const now = performance.now();
             for (let i = this.smokeGrenadesMasivs.length - 1; i >= 0; i--) {
                 let smk = this.smokeGrenadesMasivs[i];
@@ -439,51 +464,56 @@ const CoreEngine = {
     ProceduralModels: {
         compiledDecks: {},
         compileAll() {
-            const usp = new THREE.Group();
-            usp.add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.045, 0.16), new THREE.MeshStandardMaterial({ color: 0x1e293b })));
-            usp.position.set(0.15, -0.15, -0.3);
-            this.compiledDecks["pistol"] = usp;
+            // Detalizētāka ieroču procedurālā modelēšana (Pamats + Stobrs + Aptvere)
+            const createWeapon = (baseColor, length, thickness) => {
+                const group = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.BoxGeometry(thickness, thickness*1.5, length), new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.4 }));
+                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(thickness*0.3, thickness*0.3, length*0.8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, thickness*0.3, -length*0.6);
+                const handle = new THREE.Mesh(new THREE.BoxGeometry(thickness*0.9, thickness*2, thickness), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+                handle.position.set(0, -thickness*1.2, length*0.2);
+                group.add(body, barrel, handle);
+                return group;
+            };
 
-            const de = new THREE.Group();
-            de.add(new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.055, 0.2), new THREE.MeshStandardMaterial({ color: 0x475569 })));
-            de.position.set(0.15, -0.15, -0.35);
-            this.compiledDecks["deagle"] = de;
+            this.compiledDecks["pistol"] = createWeapon(0x2d3748, 0.22, 0.03);
+            this.compiledDecks["pistol"].position.set(0.18, -0.18, -0.35);
 
-            const m4 = new THREE.Group();
-            m4.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.065, 0.34), new THREE.MeshStandardMaterial({ color: 0x0f172a })));
-            m4.position.set(0.2, -0.2, -0.4);
-            this.compiledDecks["m4a4"] = m4;
+            this.compiledDecks["deagle"] = createWeapon(0x718096, 0.28, 0.04);
+            this.compiledDecks["deagle"].position.set(0.18, -0.18, -0.4);
 
-            const ak = new THREE.Group();
-            ak.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.055, 0.36), new THREE.MeshStandardMaterial({ color: 0x111827 })));
-            ak.position.set(0.2, -0.2, -0.4);
-            this.compiledDecks["ak47"] = ak;
+            this.compiledDecks["m4a4"] = createWeapon(0x1a202c, 0.55, 0.05);
+            this.compiledDecks["m4a4"].position.set(0.22, -0.22, -0.5);
 
-            const awp = new THREE.Group();
-            awp.add(new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.075, 0.48), new THREE.MeshStandardMaterial({ color: 0x14532d })));
-            awp.position.set(0.22, -0.22, -0.5);
-            this.compiledDecks["awp"] = awp;
+            this.compiledDecks["ak47"] = createWeapon(0x2c1a10, 0.58, 0.05); // Koka dizains stobram
+            this.compiledDecks["ak47"].position.set(0.22, -0.22, -0.5);
+
+            this.compiledDecks["awp"] = createWeapon(0x276749, 0.85, 0.06); // Zaļais AWP dizains
+            this.compiledDecks["awp"].position.set(0.25, -0.22, -0.6);
         },
         mount(type) {
-            const anchor = CoreEngine.ThreeSetup.gunAnchor;
-            while(anchor.children.length > 0) anchor.remove(anchor.children[0]);
-            anchor.add(this.compiledDecks[type].clone());
+            const holder = CoreEngine.ThreeSetup.gunMeshHolder;
+            while(holder.children.length > 0) holder.remove(holder.children[0]);
+            holder.add(this.compiledDecks[type].clone());
         }
     },
 
     BotIntelligence: {
         bots: [],
         spawnSquad() {
-            for(let i=0; i<3; i++) {
+            for(let i=0; i<4; i++) {
                 const geo = new THREE.CylinderGeometry(0.6, 0.6, 2.3, 8);
-                const mat = new THREE.MeshStandardMaterial({ color: 0xef4444 });
+                const mat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6 });
                 const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set((Math.random() - 0.5) * 60, 1.15, (Math.random() - 0.5) * 60 - 20);
+                mesh.position.set((Math.random() - 0.5) * 120, 1.15, (Math.random() - 0.5) * 120 - 30);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
                 CoreEngine.ThreeSetup.scene.add(mesh);
-                this.bots.push({ mesh: mesh, hp: 100, lastShot: 0 });
+                this.bots.push({ mesh: mesh, hp: 100 });
             }
         },
-        update(delta, playerPos, now) {
+        update(playerPos) {
             this.bots.forEach(bot => {
                 bot.mesh.lookAt(playerPos.x, bot.mesh.position.y, playerPos.z);
             });
@@ -499,6 +529,10 @@ const CoreEngine = {
                 p.activeGear = type;
                 p.ammoClips[type] = targetSpecs.clipMax;
                 p.ammoReserves[type] = targetSpecs.reserveMax;
+                p.isScoped = false;
+                CoreEngine.ThreeSetup.camera.fov = 74;
+                CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
+                document.getElementById('sniper-scope-overlay').style.display = 'none';
                 CoreEngine.ProceduralModels.mount(type);
                 CoreEngine.InterfaceHUD.refresh();
                 this.closeMenu();
@@ -521,7 +555,7 @@ const CoreEngine = {
                 if (document.pointerLockElement === document.body) {
                     db.style.display = 'none';
                     hud.style.display = 'block';
-                    ch.style.display = 'block';
+                    if(!CoreEngine.PlayerEntity.isScoped) ch.style.display = 'block';
                     CoreEngine.isLocked = true;
                 } else {
                     CoreEngine.isLocked = false;
@@ -534,8 +568,12 @@ const CoreEngine = {
 
             document.addEventListener('mousemove', (e) => {
                 if (!CoreEngine.isLocked) return;
-                mouseRotation.y -= e.movementX * 0.0022;
-                mouseRotation.x -= e.movementY * 0.0022;
+                
+                // Ja pietuvināts (Scoped), samazina peles jutību precizitātei
+                let sensitivity = CoreEngine.PlayerEntity.isScoped ? 0.0007 : 0.0022;
+                
+                mouseRotation.y -= e.movementX * sensitivity;
+                mouseRotation.x -= e.movementY * sensitivity;
                 mouseRotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, mouseRotation.x));
                 CoreEngine.ThreeSetup.camera.quaternion.setFromEuler(mouseRotation);
             });
@@ -546,13 +584,21 @@ const CoreEngine = {
                 if (k === 'a') keys.a = true;
                 if (k === 's') keys.s = true;
                 if (k === 'd') keys.d = true;
+                if (k === ' ') keys[' '] = true;
+                if (k === 'shift') keys.shift = true;
+                
+                if (k === 'r' && CoreEngine.isLocked) {
+                    CoreEngine.EngineActions.reloadWeapon();
+                }
                 if (k === 'b' && CoreEngine.isLocked) {
                     CoreEngine.isBuyOpen = true;
                     CoreEngine.isLocked = false;
                     document.exitPointerLock();
                     document.getElementById('tactical-buy-menu').style.display = 'flex';
                 }
-                if (k === 'o' && CoreEngine.isLocked) CoreEngine.EngineActions.throwSmokeGrenade();
+                if (k === 'o' && CoreEngine.isLocked) {
+                    CoreEngine.EngineActions.throwSmokeGrenade();
+                }
             });
 
             document.addEventListener('keyup', (e) => {
@@ -561,26 +607,111 @@ const CoreEngine = {
                 if (k === 'a') keys.a = false;
                 if (k === 's') keys.s = false;
                 if (k === 'd') keys.d = false;
+                if (k === ' ') keys[' '] = false;
+                if (k === 'shift') keys.shift = false;
             });
 
             document.addEventListener('mousedown', (e) => {
                 if (!CoreEngine.isLocked) return;
-                if (e.button === 0) CoreEngine.EngineActions.triggerWeaponShot();
+                if (e.button === 0) {
+                    isLeftMousePressed = true;
+                    if(!CoreEngine.WeaponArsenal[CoreEngine.PlayerEntity.activeGear].auto) {
+                        CoreEngine.EngineActions.triggerWeaponShot();
+                    }
+                }
+                if (e.button === 2) {
+                    CoreEngine.EngineActions.toggleScope();
+                }
             });
+
+            document.addEventListener('mouseup', (e) => {
+                if (e.button === 0) isLeftMousePressed = false;
+            });
+
             document.addEventListener('contextmenu', e => e.preventDefault());
         }
     },
 
     EngineActions: {
         throwSmokeGrenade() {
-            CoreEngine.EnvironmentBuilder.deploySmoke(CoreEngine.ThreeSetup.camera.position);
+            const dir = new THREE.Vector3();
+            CoreEngine.ThreeSetup.camera.getWorldDirection(dir);
+            CoreEngine.EnvironmentBuilder.deploySmoke(CoreEngine.ThreeSetup.camera.position, dir);
+            CoreEngine.InterfaceHUD.logKillEvent("Izmesta dūmu granāta!");
+        },
+        toggleScope() {
+            const p = CoreEngine.PlayerEntity;
+            if(p.activeGear !== 'awp') return; // Tikai AWP var tēmēt
+            
+            p.isScoped = !p.isScoped;
+            const scopeOverlay = document.getElementById('sniper-scope-overlay');
+            const crosshair = document.getElementById('dynamic-crosshair');
+            
+            if(p.isScoped) {
+                CoreEngine.ThreeSetup.camera.fov = 20; // Zoom efekts
+                scopeOverlay.style.display = 'block';
+                crosshair.style.display = 'none';
+                CoreEngine.ThreeSetup.gunMeshHolder.visible = false; // Paslēpj ieroci skatā
+            } else {
+                CoreEngine.ThreeSetup.camera.fov = 74;
+                scopeOverlay.style.display = 'none';
+                crosshair.style.display = 'block';
+                CoreEngine.ThreeSetup.gunMeshHolder.visible = true;
+            }
+            CoreEngine.ThreeSetup.camera.updateProjectionMatrix();
+        },
+        reloadWeapon() {
+            const p = CoreEngine.PlayerEntity;
+            const w = CoreEngine.WeaponArsenal[p.activeGear];
+            if(p.isReloading || p.ammoClips[p.activeGear] === w.clipMax || p.ammoReserves[p.activeGear] <= 0) return;
+            
+            p.isReloading = true;
+            p.reloadEndTime = performance.now() + 2000; // 2 sekunžu pārlāde
+            CoreEngine.InterfaceHUD.logKillEvent("Pārlādē...");
         },
         triggerWeaponShot() {
             const p = CoreEngine.PlayerEntity;
-            if (p.ammoClips[p.activeGear] <= 0) return;
+            const w = CoreEngine.WeaponArsenal[p.activeGear];
+            const now = performance.now();
+            
+            if (p.isReloading || p.ammoClips[p.activeGear] <= 0) return;
+            if (now - lastShotTimestamp < (60000 / w.rpm)) return;
+            
+            lastShotTimestamp = now;
             p.ammoClips[p.activeGear]--;
+            
+            // Recoil (Atitiens) sistēma
+            p.recoilVisual = 0.15;
+            mouseRotation.x += w.recoil; // Kamera uzraujas uz augšu
+            
+            // Ieroča šāviena vizuālā animācija (Atsitiens atpakaļ)
+            CoreEngine.ThreeSetup.gunMeshHolder.position.z += 0.12;
+
+            // Crosshair paplašināšanās efekts HUDā
+            const crosshairSegments = document.querySelectorAll('.hair-segment');
+            crosshairSegments.forEach(s => s.style.transform = 'scale(1.8)');
+            setTimeout(() => {
+                crosshairSegments.forEach(s => s.style.transform = 'scale(1)');
+            }, 80);
+
             CoreEngine.InterfaceHUD.refresh();
-            CoreEngine.InterfaceHUD.logKillEvent("Izšauts šāviens!");
+            
+            // Hitscan loģika (pārbaude vai trāpa botam)
+            const raycaster = new THREE.Raycaster();
+            const center = new THREE.Vector2(0, 0);
+            raycaster.setFromCamera(center, CoreEngine.ThreeSetup.camera);
+            
+            // Savāc botu objektus pārbaudei
+            const targets = CoreEngine.BotIntelligence.bots.map(b => b.mesh);
+            const intersects = raycaster.intersectObjects(targets);
+            
+            if(intersects.length > 0) {
+                const hitMesh = intersects[0].object;
+                const hitBot = CoreEngine.BotIntelligence.bots.find(b => b.mesh === hitMesh);
+                if(hitBot) {
+                    CoreEngine.InterfaceHUD.logKillEvent(`Trāpīts mērķim! (-${w.dmg} HP)`);
+                }
+            }
         }
     },
 
@@ -612,8 +743,29 @@ const CoreEngine = {
             const p = CoreEngine.PlayerEntity;
             const cam = CoreEngine.ThreeSetup.camera;
 
+            // Atgriež ieroci sākuma pozīcijā pēc atsitiena (Lerp)
+            CoreEngine.ThreeSetup.gunMeshHolder.position.z += (0 - CoreEngine.ThreeSetup.gunMeshHolder.position.z) * 15 * delta;
+
+            // Pārlādes taimera kontrole
+            if (p.isReloading && performance.now() > p.reloadEndTime) {
+                p.isReloading = false;
+                const w = CoreEngine.WeaponArsenal[p.activeGear];
+                let needed = w.clipMax - p.ammoClips[p.activeGear];
+                let transfer = Math.min(needed, p.ammoReserves[p.activeGear]);
+                p.ammoClips[p.activeGear] += transfer;
+                p.ammoReserves[p.activeGear] -= transfer;
+                CoreEngine.InterfaceHUD.refresh();
+            }
+
+            // Automātiskās šaušanas kontrole (AK47 un M4A4)
+            if (isLeftMousePressed && CoreEngine.isLocked && CoreEngine.WeaponArsenal[p.activeGear].auto) {
+                CoreEngine.EngineActions.triggerWeaponShot();
+            }
+
             if (CoreEngine.isLocked) {
                 let speed = p.baseSpeed;
+                if (keys.shift) speed *= 0.45; // SHIFT lēnā staigāšana
+
                 direction.z = Number(keys.s) - Number(keys.w);
                 direction.x = Number(keys.d) - Number(keys.a);
                 direction.normalize();
@@ -624,23 +776,38 @@ const CoreEngine = {
                 if (keys.w || keys.s) velocity.z += direction.z * speed * delta;
                 if (keys.a || keys.d) velocity.x += direction.x * speed * delta;
 
+                // Gravitācija un lēkšana
+                p.verticalVelocity -= 28.0 * delta; // Gravitācijas spēks
+                cam.position.y += p.verticalVelocity * delta;
+
+                if (cam.position.y <= p.eyeHeight) {
+                    p.verticalVelocity = 0;
+                    cam.position.y = p.eyeHeight;
+                    p.canJump = true;
+                }
+
+                if (keys[' '] && p.canJump) {
+                    p.verticalVelocity = 10.5; // Lēciena spēks
+                    p.canJump = false;
+                }
+
                 cam.translateOnAxis(new THREE.Vector3(1, 0, 0), velocity.x * delta);
                 cam.translateOnAxis(new THREE.Vector3(0, 0, 1), velocity.z * delta);
-                cam.position.y = p.eyeHeight;
 
-                // MULTIPLAYER DATU SŪTĪŠANA UZ SERVERI
+                // MULTIPLAYER DATORU SŪTĪŠANA UZ SERVERI (Glabā tavas spēles datus tālāk)
                 if (socket && socket.connected) {
                     socket.emit('gajiens', {
                         x: cam.position.x,
                         y: cam.position.y - p.eyeHeight,
                         z: cam.position.z,
-                        rotation: mouseRotation.y
+                        rotation: mouseRotation.y,
+                        weapon: p.activeGear
                     });
                 }
             }
 
-            CoreEngine.EnvironmentBuilder.updateSmokes(delta);
-            CoreEngine.BotIntelligence.update(delta, cam.position, timestamp);
+            CoreEngine.EnvironmentBuilder.updateSmokes();
+            CoreEngine.BotIntelligence.update(cam.position);
             CoreEngine.ThreeSetup.renderer.render(CoreEngine.ThreeSetup.scene, cam);
         }
     }
